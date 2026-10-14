@@ -41,9 +41,9 @@ const startServer = async () => {
     initSockets(httpServer);
     console.log('[Looop Socket.IO] Real-time messaging service attached.');
 
-    httpServer.listen(PORT, () => {
-      console.log(`[Looop Server] Listening on http://localhost:${PORT}`);
-      console.log(`[Looop Server] Health check available at http://localhost:${PORT}/api/health`);
+    httpServer.listen(PORT, '0.0.0.0', () => {
+      console.log(`[Looop Server] Listening on port ${PORT} (host: 0.0.0.0)`);
+      console.log(`[Looop Server] Health check available at /api/health`);
     });
 
     // Graceful Shutdown

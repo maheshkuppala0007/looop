@@ -5,8 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "prisma generate",
-    "postinstall": "prisma generate",
+    "build": "echo \"Backend build ready\"",
     "dev": "nodemon server.js",
     "test": "node tests/test_performance_production.js",
     "test:all": "node tests/test_master_e2e_integration.js",

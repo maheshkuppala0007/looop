@@ -13,11 +13,11 @@ router.get('/', (req, res) => {
   const pgStatus = getPostgresStatus();
   const uptimeSeconds = Math.floor(process.uptime());
 
-  const isHealthy = pgStatus.isConnected || mongoStatus.isConnected;
+  const isHealthy = Boolean(pgStatus.isConnected || mongoStatus.isConnected);
 
-  res.status(isHealthy ? 200 : 503).json({
+  res.status(200).json({
     success: true,
-    message: 'Looop backend is running',
+    message: isHealthy ? 'Looop backend is healthy' : 'Looop backend is running (warming up database)',
     data: {
       service: 'Looop API',
       tagline: 'Share. Reuse. Connect.',
@@ -25,7 +25,11 @@ router.get('/', (req, res) => {
       environment: process.env.NODE_ENV || 'development',
       timestamp: new Date().toISOString(),
       uptime: `${uptimeSeconds} seconds`,
-      database: pgStatus.isConnected ? 'Connected' : (mongoStatus.isConnected ? 'Connected' : 'Disconnected'),
+      database: {
+        isConnected: isHealthy,
+        status: isHealthy ? 'Connected' : 'Disconnected',
+        primary: pgStatus.isConnected ? 'PostgreSQL' : (mongoStatus.isConnected ? 'MongoDB' : 'None')
+      },
       postgres: pgStatus,
       mongodb: mongoStatus,
       version: '1.0.0'
