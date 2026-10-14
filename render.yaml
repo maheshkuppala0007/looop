@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: looop-backend
+    name: looop-mahesh-backend
     runtime: node
     plan: free
     rootDir: server
