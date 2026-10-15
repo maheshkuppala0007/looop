@@ -45,9 +45,9 @@ try {
 
 const getItemImageUrl = (item) => {
   const first = item?.images?.[0];
-  if (!first) return 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=100';
+  if (!first) return '';
   if (typeof first === 'string') return first;
-  return first.url || 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=100';
+  return first.url || '';
 };
 
 export const AdminItemsPage = () => {
@@ -353,10 +353,9 @@ export const AdminItemsPage = () => {
             src={getItemImageUrl(item)}
             alt=""
             onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=100';
+              e.currentTarget.style.display = 'none';
             }}
-            style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-xs)', objectFit: 'cover', flexShrink: 0 }}
+            style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-xs)', objectFit: 'cover', flexShrink: 0, backgroundColor: '#334155' }}
           />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontWeight: 600, color: '#f8fafc' }}>{item.title}</span>
@@ -1055,10 +1054,9 @@ export const AdminItemsPage = () => {
                           src={imgUrl}
                           alt=""
                           onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=100';
+                            e.currentTarget.style.display = 'none';
                           }}
-                          style={{ width: '80px', height: '80px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }}
+                          style={{ width: '80px', height: '80px', borderRadius: 'var(--radius-sm)', objectFit: 'cover', backgroundColor: '#334155' }}
                         />
                       );
                     })}

@@ -35,12 +35,10 @@ export const LiveListingPreview = ({
 
   // Fallback presentation data
   const displayTitle = title.trim() || 'Untitled Community Item';
-  const displayImage =
-    images && images.length > 0
-      ? typeof images[0] === 'string'
-        ? images[0]
-        : images[0].url
-      : 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80';
+  const rawImg = images && images.length > 0 ? images[0] : null;
+  const displayImage = rawImg
+    ? (typeof rawImg === 'string' ? rawImg : (rawImg.url || ''))
+    : '';
 
   const conditionLabels = {
     new: { label: 'New', variant: 'success' },
@@ -144,12 +142,22 @@ export const LiveListingPreview = ({
           className="preview-3d-card"
         >
           {/* Card Top: Primary Image + Overlay Pills */}
-          <div style={{ position: 'relative', width: '100%', height: '220px', backgroundColor: '#f1f5f9' }}>
-            <img
-              src={displayImage}
-              alt="Listing preview"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
+          <div style={{ position: 'relative', width: '100%', height: '220px', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {displayImage ? (
+              <img
+                src={displayImage}
+                alt="Listing preview"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', color: '#94a3b8' }}>
+                <ImageIcon size={36} />
+                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Photos will appear here</span>
+              </div>
+            )}
 
             {/* Top Left: Sharing Type Badge */}
             <div

@@ -1,23 +1,43 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Maximize2, X, Image as ImageIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Maximize2, X, Image as ImageIcon, Package } from 'lucide-react';
 
-const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&auto=format&fit=crop&q=80';
+function resolveImageUrl(img) {
+  if (!img) return '';
+  if (typeof img === 'string') return img;
+  if (img.url && typeof img.url === 'string') return img.url;
+  return '';
+}
 
 export const ItemImageGallery = ({ images = [], itemTitle = 'Item Image' }) => {
-  const safeImages = Array.isArray(images) && images.length > 0 ? images : [FALLBACK_IMAGE];
+  // Normalize images array to pure string URLs
+  const rawImages = Array.isArray(images) ? images : [];
+  const safeImages = rawImages
+    .map(resolveImageUrl)
+    .filter((url) => typeof url === 'string' && url.trim().length > 0 && url !== '[object Object]');
+
   const [activeIndex, setActiveIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
 
+  // Reset index when images list changes
+  useEffect(() => {
+    setActiveIndex(0);
+    setImageError(false);
+  }, [images]);
+
   // Prev / Next Handlers
   const handlePrev = useCallback((e) => {
     e?.stopPropagation();
+    if (safeImages.length === 0) return;
     setActiveIndex((prev) => (prev === 0 ? safeImages.length - 1 : prev - 1));
+    setImageError(false);
   }, [safeImages.length]);
 
   const handleNext = useCallback((e) => {
     e?.stopPropagation();
+    if (safeImages.length === 0) return;
     setActiveIndex((prev) => (prev === safeImages.length - 1 ? 0 : prev + 1));
+    setImageError(false);
   }, [safeImages.length]);
 
   // Keyboard navigation for Lightbox (Escape, ArrowLeft, ArrowRight)
@@ -40,6 +60,9 @@ export const ItemImageGallery = ({ images = [], itemTitle = 'Item Image' }) => {
     };
   }, [lightboxOpen, handlePrev, handleNext]);
 
+  const activeImageUrl = safeImages[activeIndex] || '';
+  const hasImages = safeImages.length > 0 && !imageError;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }} className="item-image-gallery">
       {/* 1. Main Display Image Container */}
@@ -54,27 +77,69 @@ export const ItemImageGallery = ({ images = [], itemTitle = 'Item Image' }) => {
           backgroundColor: '#f1f5f9',
           border: '1px solid var(--color-slate-200)',
           boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
-          cursor: 'pointer'
+          cursor: hasImages ? 'pointer' : 'default',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}
-        onClick={() => setLightboxOpen(true)}
+        onClick={() => {
+          if (hasImages) setLightboxOpen(true);
+        }}
         className="main-image-container"
-        title="Click to view full size"
+        title={hasImages ? 'Click to view full size' : itemTitle}
       >
-        <img
-          src={imageError ? FALLBACK_IMAGE : safeImages[activeIndex]}
-          alt={`${itemTitle} - Photo ${activeIndex + 1}`}
-          onError={() => setImageError(true)}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            transition: 'transform 0.3s ease'
-          }}
-          className="gallery-main-img"
-        />
+        {hasImages ? (
+          <img
+            src={activeImageUrl}
+            alt={`${itemTitle} - Photo ${activeIndex + 1}`}
+            onError={() => setImageError(true)}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transition: 'transform 0.3s ease'
+            }}
+            className="gallery-main-img"
+          />
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              padding: '2rem',
+              textAlign: 'center',
+              color: 'var(--color-slate-400)'
+            }}
+          >
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                backgroundColor: '#e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Package size={32} color="#64748b" />
+            </div>
+            <div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-slate-700)' }}>
+                {itemTitle}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-slate-400)', marginTop: '4px' }}>
+                No additional photo preview uploaded
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Image Counter Badge */}
-        {safeImages.length > 1 && (
+        {safeImages.length > 1 && !imageError && (
           <div
             style={{
               position: 'absolute',
@@ -95,29 +160,31 @@ export const ItemImageGallery = ({ images = [], itemTitle = 'Item Image' }) => {
         )}
 
         {/* Fullscreen Expansion Icon */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '14px',
-            right: '14px',
-            width: '34px',
-            height: '34px',
-            borderRadius: '50%',
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--color-slate-700)',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)'
-          }}
-          className="gallery-expand-pill"
-        >
-          <Maximize2 size={16} />
-        </div>
+        {hasImages && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '14px',
+              right: '14px',
+              width: '34px',
+              height: '34px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-slate-700)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+            }}
+            title="Expand photo"
+          >
+            <Maximize2 size={16} />
+          </div>
+        )}
 
-        {/* Gallery Navigation Arrows (if multiple images) */}
-        {safeImages.length > 1 && (
+        {/* Prev / Next Chevrons on Main Image */}
+        {safeImages.length > 1 && !imageError && (
           <>
             <button
               type="button"
@@ -187,13 +254,16 @@ export const ItemImageGallery = ({ images = [], itemTitle = 'Item Image' }) => {
           }}
           className="thumbnail-strip"
         >
-          {safeImages.map((img, idx) => {
+          {safeImages.map((thumbUrl, idx) => {
             const isActive = activeIndex === idx;
             return (
               <button
                 key={idx}
                 type="button"
-                onClick={() => setActiveIndex(idx)}
+                onClick={() => {
+                  setActiveIndex(idx);
+                  setImageError(false);
+                }}
                 aria-label={`View photo ${idx + 1}`}
                 style={{
                   width: '72px',
@@ -211,9 +281,12 @@ export const ItemImageGallery = ({ images = [], itemTitle = 'Item Image' }) => {
                 className="gallery-thumb"
               >
                 <img
-                  src={img}
+                  src={thumbUrl}
                   alt={`Thumbnail ${idx + 1}`}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
                 />
               </button>
             );
@@ -221,19 +294,19 @@ export const ItemImageGallery = ({ images = [], itemTitle = 'Item Image' }) => {
         </div>
       )}
 
-      {/* 3. Lightbox Modal */}
+      {/* 3. High-Res Fullscreen Lightbox Modal */}
       {lightboxOpen && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
             zIndex: 150,
-            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
             backdropFilter: 'blur(8px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '1.5rem'
+            padding: '20px'
           }}
           onClick={() => setLightboxOpen(false)}
           role="dialog"
@@ -329,7 +402,7 @@ export const ItemImageGallery = ({ images = [], itemTitle = 'Item Image' }) => {
             onClick={(e) => e.stopPropagation()}
           >
             <img
-              src={safeImages[activeIndex]}
+              src={activeImageUrl}
               alt={`${itemTitle} - Full Preview`}
               style={{
                 maxWidth: '100%',
@@ -347,44 +420,6 @@ export const ItemImageGallery = ({ images = [], itemTitle = 'Item Image' }) => {
           </div>
         </div>
       )}
-
-      <style>{`
-        .main-image-container {
-          transform-style: preserve-3d;
-          perspective: 1000px;
-          transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
-          will-change: transform;
-        }
-        .main-image-container:hover {
-          transform: perspective(1000px) translateZ(24px) scale(1.025);
-          box-shadow: 0 16px 36px -6px rgba(16, 185, 129, 0.25), 0 8px 16px rgba(15, 23, 42, 0.08) !important;
-          border-color: #10b981 !important;
-        }
-        .main-image-container:hover .gallery-main-img {
-          transform: scale(1.06) translateZ(10px);
-        }
-        .gallery-arrow-btn:hover {
-          transform: translateY(-50%) scale(1.12) !important;
-          background-color: #ffffff !important;
-        }
-        .gallery-thumb {
-          transition: transform 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
-        }
-        .gallery-thumb:hover {
-          transform: translateY(-3px) scale(1.05);
-          opacity: 1;
-        }
-        .lightbox-close-btn:hover {
-          background-color: rgba(255, 255, 255, 0.3) !important;
-        }
-        @keyframes zoom3dIn {
-          0% { opacity: 0; transform: scale(0.88) translateZ(-50px); }
-          100% { opacity: 1; transform: scale(1) translateZ(0); }
-        }
-        .lightbox-3d-content {
-          animation: zoom3dIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-      `}</style>
     </div>
   );
 };

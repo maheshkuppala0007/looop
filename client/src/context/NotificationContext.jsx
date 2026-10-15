@@ -269,18 +269,31 @@ export const NotificationProvider = ({ children }) => {
       }
     };
 
+    const onCountUpdated = () => {
+      fetchUnreadCount();
+    };
+
     socket.on('new_notification', onNewNotification);
+    socket.on('notification_count_updated', onCountUpdated);
 
     return () => {
       socket.off('new_notification', onNewNotification);
+      socket.off('notification_count_updated', onCountUpdated);
     };
-  }, [socket, isAuthenticated, handleRealtimeNotification]);
+  }, [socket, isAuthenticated, handleRealtimeNotification, fetchUnreadCount]);
 
-  // Sync state on user login / logout
+  // Sync state on user login / logout + periodic polling fallback
   useEffect(() => {
     if (isAuthenticated) {
       fetchUnreadCount();
       fetchPreferences();
+
+      // Reliable 15-second polling ensures user never misses a notification even without WebSockets
+      const interval = setInterval(() => {
+        fetchUnreadCount();
+      }, 15000);
+
+      return () => clearInterval(interval);
     } else {
       setNotifications([]);
       setUnreadCount(0);

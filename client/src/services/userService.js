@@ -25,6 +25,21 @@ export const userService = {
   },
 
   /**
+   * Upload user profile photo (WhatsApp DP style)
+   */
+  uploadAvatar: async (fileOrFormData) => {
+    let body = fileOrFormData;
+    let headers = {};
+    if (fileOrFormData instanceof File) {
+      body = new FormData();
+      body.append('avatar', fileOrFormData);
+      headers = { 'Content-Type': 'multipart/form-data' };
+    }
+    const response = await api.post('/users/me/avatar', body, { headers });
+    return response.data;
+  },
+
+  /**
    * Fetch public community profile of any user by ID
    */
   getPublicProfile: async (userId) => {

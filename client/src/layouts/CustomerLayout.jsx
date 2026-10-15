@@ -444,7 +444,7 @@ export const CustomerLayout = ({ children }) => {
       )}
 
       {/* 3. MAIN WORKSPACE CONTAINER */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowX: 'hidden' }}>
         {/* TOPBAR HEADER */}
         <header
           style={{
@@ -484,7 +484,7 @@ export const CustomerLayout = ({ children }) => {
               <Menu size={20} />
             </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="customer-portal-badge">
               <Badge variant="success">Customer Portal</Badge>
               <span style={{ fontSize: '0.78rem', color: 'var(--color-slate-400)', display: 'none' }} className="brand-tagline-indicator">
                 Share. Reuse. Connect.
@@ -624,8 +624,8 @@ export const CustomerLayout = ({ children }) => {
         </header>
 
         {/* MAIN DASHBOARD CONTENT VIEWPORT */}
-        <main style={{ flex: 1, padding: '1.75rem 2rem 5rem 2rem' }} className="customer-main-content">
-          <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%' }}>{children}</div>
+        <main style={{ flex: 1, padding: '1.75rem 2rem 5rem 2rem', minWidth: 0, width: '100%', boxSizing: 'border-box' }} className="customer-main-content">
+          <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>{children}</div>
         </main>
       </div>
 
@@ -666,16 +666,11 @@ export const CustomerLayout = ({ children }) => {
         </Link>
 
         <Link
-          to="/messages"
-          className={`bottom-nav-item ${isActive('/messages') ? 'active' : ''}`}
+          to="/profile"
+          className={`bottom-nav-item ${isActive('/profile') ? 'active' : ''}`}
         >
-          <div style={{ position: 'relative', display: 'inline-flex' }}>
-            <MessageSquare size={20} />
-            {unreadMessagesCount > 0 && (
-              <span className="bottom-nav-badge">{unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}</span>
-            )}
-          </div>
-          <span>Chat</span>
+          <User size={20} />
+          <span>Profile</span>
         </Link>
       </nav>
 
@@ -809,6 +804,13 @@ export const CustomerLayout = ({ children }) => {
         }
 
         @media (max-width: 480px) {
+          .customer-portal-badge {
+            display: none !important;
+          }
+          .dashboard-search-input {
+            font-size: 0.8rem !important;
+            padding: 6px 10px 6px 32px !important;
+          }
           .customer-main-content {
             padding: 0.85rem 0.5rem 5.5rem 0.5rem !important;
           }

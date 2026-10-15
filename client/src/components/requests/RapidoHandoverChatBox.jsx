@@ -10,7 +10,8 @@ import {
   Phone,
   Sparkles,
   Lock,
-  PackageCheck
+  PackageCheck,
+  MessageSquare
 } from 'lucide-react';
 import Button from '../common/Button';
 import Avatar from '../common/Avatar';
@@ -24,9 +25,11 @@ import { useToast } from '../../hooks/useToast';
 
 /**
  * RapidoHandoverChatBox
- * Ephemeral trip/order-style coordination chatbox for item pickup and handover.
- * Once the item is marked as "Taken", the chatbox permanently closes
- * and wipes all conversation messages from the database.
+ * Real-time, WhatsApp-style coordination chatbox for product handover.
+ * Exclusively visible to the two customers (requester and owner).
+ * Delivers messages instantly within seconds via Socket.IO.
+ * Once the item is marked as "Taken" / Handover complete, the chatbox
+ * permanently closes and wipes all conversation messages from the database.
  */
 export const RapidoHandoverChatBox = ({
   request,
@@ -44,30 +47,38 @@ export const RapidoHandoverChatBox = ({
   const [markingTaken, setMarkingTaken] = useState(false);
   const [isTaken, setIsTaken] = useState(request?.status === 'COMPLETED');
 
-  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const pollTimerRef = useRef(null);
 
-  const currentUserId = user?.id || user?._id;
-  const isOwner = (request?.owner?._id || request?.owner?.id || request?.owner) === currentUserId;
-  const isRequester = (request?.requester?._id || request?.requester?.id || request?.requester) === currentUserId;
+  const currentUserId = String(user?.id || user?._id || '');
+  const targetReqId = String(request?.id || request?._id || '');
+
+  const ownerId = String(request?.owner?.id || request?.owner?._id || request?.owner_id || request?.owner || '');
+  const requesterId = String(request?.requester?.id || request?.requester?._id || request?.requester_id || request?.requester || '');
+
+  const isOwner = ownerId === currentUserId;
+  const isRequester = requesterId === currentUserId;
   const partner = isOwner ? request?.requester : request?.owner;
 
-  // Determine partner location text
+  // Partner display location
   const partnerLocation = isOwner
-    ? request?.handoverLocation?.city || request?.requester?.locality || request?.requester?.city || 'Nearby Location'
+    ? request?.location || request?.requester?.locality || request?.requester?.city || 'Customer Area'
     : request?.item?.location?.city || request?.item?.location?.locality || request?.owner?.city || 'Item Pickup Point';
 
-  const partnerPhone = partner?.phone || '';
+  const partnerPhone = partner?.phone || request?.phone || '';
 
+  // Scroll ONLY the inner message container, never the browser window
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   };
 
   // Load conversation and messages
   const loadConversationAndMessages = useCallback(async () => {
-    if (!request?._id) return;
+    if (!targetReqId) return;
     try {
-      const convRes = await messageService.getConversationByRequest(request._id);
+      const convRes = await messageService.getConversationByRequest(targetReqId);
       if (convRes?.isTaken || convRes?.closed) {
         setIsTaken(true);
         setConversation(null);
@@ -76,17 +87,19 @@ export const RapidoHandoverChatBox = ({
         return;
       }
 
-      if (convRes?.conversationId || convRes?.conversation?._id) {
-        const convId = convRes.conversationId || convRes.conversation._id;
-        setConversation(convRes.conversation || { _id: convId });
+      const activeConv = convRes?.conversation || convRes;
+      const convId = convRes?.conversationId || activeConv?.id || activeConv?._id;
 
-        // Fetch messages
+      if (convId) {
+        setConversation({ ...activeConv, id: convId, _id: convId });
+
+        // Fetch messages history
         const msgRes = await messageService.getMessages(convId);
         if (msgRes?.messages) {
           setMessages(msgRes.messages);
         }
 
-        // Join socket room
+        // Join real-time socket room
         socketService.joinConversation(convId);
       }
     } catch (err) {
@@ -94,7 +107,7 @@ export const RapidoHandoverChatBox = ({
     } finally {
       setLoading(false);
     }
-  }, [request?._id]);
+  }, [targetReqId]);
 
   useEffect(() => {
     if (request?.status === 'COMPLETED') {
@@ -105,14 +118,20 @@ export const RapidoHandoverChatBox = ({
 
     loadConversationAndMessages();
 
-    // Listen for new messages & item taken events via Socket
-    const handleNewMessage = (msg) => {
+    // Listen for real-time messages & item taken events via Socket
+    const handleNewMessage = (payload) => {
+      const msg = payload?.message || payload;
       if (!msg) return;
       setMessages((prev) => {
-        if (prev.some((m) => m._id === msg._id || m.id === msg.id)) return prev;
+        const msgId = msg.id || msg._id;
+        // Avoid duplicate if optimistic message already exists
+        const exists = prev.some((m) => (m.id || m._id) === msgId || (m.isOptimistic && m.text === msg.text));
+        if (exists) {
+          return prev.map((m) => (m.isOptimistic && m.text === msg.text ? msg : m));
+        }
         return [...prev, msg];
       });
-      setTimeout(scrollToBottom, 100);
+      setTimeout(scrollToBottom, 50);
     };
 
     const handleItemTaken = () => {
@@ -120,8 +139,8 @@ export const RapidoHandoverChatBox = ({
       setMessages([]);
       setConversation(null);
       addToast({
-        title: 'Item Taken!',
-        message: 'The item has been marked as taken. This chat has been permanently closed and deleted from the database.',
+        title: 'Item Handover Complete!',
+        message: 'The item was marked as taken. This chat has been permanently closed and deleted from the database.',
         variant: 'info'
       });
       if (onRequestUpdated) onRequestUpdated();
@@ -131,46 +150,80 @@ export const RapidoHandoverChatBox = ({
     socketService.on('item_taken', handleItemTaken);
     socketService.on('chat_closed_item_taken', handleItemTaken);
 
-    // Light polling fallback every 6 seconds to ensure reliable messaging
+    // Fast polling fallback (every 3 seconds) for WhatsApp-fast reliability
+    const convId = conversation?.id || conversation?._id;
     pollTimerRef.current = setInterval(() => {
-      if (conversation?._id && !isTaken) {
-        messageService.getMessages(conversation._id).then((res) => {
-          if (res?.messages) setMessages(res.messages);
+      const activeId = conversation?.id || conversation?._id;
+      if (activeId && !isTaken) {
+        messageService.getMessages(activeId).then((res) => {
+          if (res?.messages && res.messages.length > 0) {
+            setMessages((prev) => {
+              if (prev.length === res.messages.length) {
+                const lastPrev = prev[prev.length - 1];
+                const lastNew = res.messages[res.messages.length - 1];
+                if ((lastPrev?.id || lastPrev?._id) === (lastNew?.id || lastNew?._id)) {
+                  return prev;
+                }
+              }
+              return res.messages;
+            });
+          }
         }).catch(() => {});
       }
-    }, 6000);
+    }, 3000);
 
     return () => {
       socketService.off('new_message', handleNewMessage);
       socketService.off('item_taken', handleItemTaken);
       socketService.off('chat_closed_item_taken', handleItemTaken);
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-      if (conversation?._id) socketService.leaveConversation(conversation._id);
+      if (convId) socketService.leaveConversation(convId);
     };
-  }, [request?._id, request?.status, conversation?._id, isTaken, loadConversationAndMessages, addToast, onRequestUpdated]);
+  }, [targetReqId, request?.status, conversation?.id, conversation?._id, isTaken, loadConversationAndMessages, addToast, onRequestUpdated]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // Handle Send Message
+  // Handle Send Message (Optimistic UI - Instant 0-second display)
   const handleSendMessage = async (textToSend) => {
     const content = (textToSend || text).trim();
-    if (!content || !conversation?._id || sending) return;
+    const convId = conversation?.id || conversation?._id;
+    if (!content || !convId || sending) return;
 
     setSending(true);
     setText('');
 
+    // Instant optimistic message bubble
+    const tempId = `temp_${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      _id: tempId,
+      conversation: convId,
+      sender: {
+        id: currentUserId,
+        _id: currentUserId,
+        name: user?.name || 'You',
+        avatar: user?.avatar || ''
+      },
+      text: content,
+      createdAt: new Date().toISOString(),
+      isOptimistic: true
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setTimeout(scrollToBottom, 30);
+
     try {
-      const res = await messageService.sendMessage(conversation._id, content);
+      const res = await messageService.sendMessage(convId, content);
       if (res?.message) {
-        setMessages((prev) => {
-          if (prev.some((m) => m._id === res.message._id)) return prev;
-          return [...prev, res.message];
-        });
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? res.message : m))
+        );
       }
       setTimeout(scrollToBottom, 50);
     } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
       addToast({
         title: 'Failed to Send',
         message: err.response?.data?.message || err.message || 'Could not send message. Please try again.',
@@ -182,7 +235,7 @@ export const RapidoHandoverChatBox = ({
     }
   };
 
-  // Quick Rapido Chips
+  // Quick WhatsApp pickup coordination chips
   const quickChips = [
     "📍 I'm at the pickup location",
     "⏰ Will reach in 10 minutes",
@@ -191,11 +244,11 @@ export const RapidoHandoverChatBox = ({
     "🤝 Ready to meet right now"
   ];
 
-  // Handle Mark Item as Taken
+  // Handle Mark Item as Taken (Permanently wipes chat from DB)
   const handleConfirmMarkTaken = async () => {
     setMarkingTaken(true);
     try {
-      const res = await requestService.markItemTaken(request._id);
+      const res = await requestService.markItemTaken(targetReqId);
       if (res && res.success) {
         setIsTaken(true);
         setIsTakenModalOpen(false);
@@ -229,6 +282,7 @@ export const RapidoHandoverChatBox = ({
   if (isTaken || request?.status === 'COMPLETED') {
     return (
       <div
+        id="chat"
         style={{
           border: '1.5px solid #a7f3d0',
           backgroundColor: '#f0fdf4',
@@ -257,15 +311,15 @@ export const RapidoHandoverChatBox = ({
           Item Handover Concluded (Item Taken)
         </h4>
         <p style={{ margin: '0 0 14px 0', fontSize: '0.875rem', color: '#15803d', lineHeight: 1.5 }}>
-          This item has been successfully received and completed.
+          This item has been successfully received. All chat coordination messages have been permanently deleted from the database for your privacy.
         </p>
         <div
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            backgroundColor: '#ffffff',
+            gap: '6px',
+            backgroundColor: '#dcfce7',
+            padding: '6px 14px',
             borderRadius: '999px',
             border: '1px solid #bbf7d0',
             fontSize: '0.8rem',
@@ -274,40 +328,46 @@ export const RapidoHandoverChatBox = ({
           }}
         >
           <Lock size={14} />
-          <span>Chat box closed & conversation messages permanently deleted from database</span>
+          <span>Chat securely closed & database records purged</span>
         </div>
       </div>
     );
   }
 
   // ====================================================
-  // 2. ACTIVE RAPIDO-STYLE HANDOVER CHATBOX
+  // 2. ACTIVE WHATSAPP-STYLE HANDOVER CHATBOX
   // ====================================================
   return (
     <>
       <div
+        id="chat"
         style={{
-          border: '1.5px solid #10b981',
+          border: '1.5px solid #059669',
           borderRadius: '18px',
           backgroundColor: '#ffffff',
-          boxShadow: '0 8px 24px rgba(16, 185, 129, 0.12)',
+          boxShadow: '0 8px 24px rgba(5, 150, 105, 0.15)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          maxHeight: '620px'
+          maxHeight: '620px',
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
+          boxSizing: 'border-box'
         }}
       >
-        {/* Top Header - Rapido Ride / Pickup Styling */}
+        {/* Top Header - WhatsApp Green Theme */}
         <div
           style={{
-            backgroundColor: '#064e3b',
+            backgroundColor: '#075E54', // WhatsApp Deep Green
             color: '#ffffff',
             padding: '12px 16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '12px',
-            borderBottom: '2px solid #047857'
+            borderBottom: '2px solid #004D40',
+            flexWrap: 'wrap'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -323,11 +383,11 @@ export const RapidoHandoverChatBox = ({
                 </span>
                 <span
                   style={{
-                    backgroundColor: '#10b981',
-                    color: '#ffffff',
+                    backgroundColor: '#25D366',
+                    color: '#075E54',
                     fontSize: '0.65rem',
-                    fontWeight: 800,
-                    padding: '2px 6px',
+                    fontWeight: 900,
+                    padding: '2px 7px',
                     borderRadius: '10px',
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em'
@@ -336,7 +396,7 @@ export const RapidoHandoverChatBox = ({
                   {isOwner ? 'Requester' : 'Owner'}
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: '#a7f3d0', marginTop: '2px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: '#A7F3D0', marginTop: '2px' }}>
                 <MapPin size={13} />
                 <span>{partnerLocation}</span>
                 {partnerPhone && (
@@ -355,13 +415,13 @@ export const RapidoHandoverChatBox = ({
             type="button"
             onClick={() => setIsTakenModalOpen(true)}
             style={{
-              backgroundColor: '#10b981',
-              color: '#ffffff',
+              backgroundColor: '#25D366',
+              color: '#075E54',
               border: 'none',
               borderRadius: '10px',
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              fontWeight: 800,
+              padding: '7px 14px',
+              fontSize: '0.78rem',
+              fontWeight: 900,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -372,106 +432,128 @@ export const RapidoHandoverChatBox = ({
             onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.03)')}
             onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
           >
-            <CheckCircle2 size={14} />
-            <span>Mark as Taken</span>
+            <CheckCircle2 size={15} />
+            <span>Product Received</span>
           </button>
         </div>
 
         {/* Ephemeral Privacy Warning Pill */}
         <div
           style={{
-            backgroundColor: '#ecfdf5',
-            padding: '6px 14px',
-            fontSize: '0.725rem',
-            color: '#065f46',
-            fontWeight: 600,
+            backgroundColor: '#DCF8C6',
+            padding: '7px 14px',
+            fontSize: '0.75rem',
+            color: '#075E54',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
-            borderBottom: '1px solid #d1fae5'
+            justifyContent: 'space-between',
+            gap: '8px',
+            borderBottom: '1px solid #C8E6C9'
           }}
         >
-          <Lock size={12} color="#059669" />
-          <span>
-            <strong>Ephemeral Pickup Chat:</strong> Messages are strictly temporary and permanently deleted from the database once the item is taken.
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Lock size={13} />
+            <span>
+              <strong>Private Coordination Chat:</strong> Messages are visible only to you and {partner?.name || 'the other member'}.
+            </span>
+          </div>
+          <span style={{ fontSize: '0.7rem', color: '#1B5E20', fontWeight: 700 }}>
+            ⚡ Purged upon handover
           </span>
         </div>
 
-        {/* Message Stream */}
+        {/* Messages Scroll Area - Scroll is strictly confined to this container */}
         <div
+          ref={messagesContainerRef}
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '14px',
+            maxHeight: '360px',
+            padding: '16px',
+            backgroundColor: '#ECE5DD', // WhatsApp chat wallpaper background
             display: 'flex',
             flexDirection: 'column',
             gap: '10px',
-            backgroundColor: '#f8fafc',
-            minHeight: '220px',
-            maxHeight: '300px'
+            minHeight: '260px'
           }}
         >
           {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '140px' }}>
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
               <Spinner size="md" />
+              <p style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b' }}>Connecting to chat...</p>
             </div>
           ) : messages.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem 1rem', color: '#64748b' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '4px' }}>
-                Active Handover Coordination
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                padding: '14px 18px',
+                borderRadius: '12px',
+                margin: 'auto',
+                textAlign: 'center',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                maxWidth: '380px'
+              }}
+            >
+              <div style={{ color: '#059669', marginBottom: '6px' }}>
+                <Sparkles size={22} style={{ display: 'inline-block' }} />
               </div>
-              <div style={{ fontSize: '0.78rem', maxWidth: '320px', margin: '0 auto' }}>
-                Coordinate meeting spot, arrival time, and safe pickup. Send a message or pick a quick suggestion below.
-              </div>
+              <h5 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', color: '#0f172a', fontWeight: 800 }}>
+                Coordination Chat Ready!
+              </h5>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4 }}>
+                Send a quick message or tap the chips below to agree on the pickup time and exact spot.
+              </p>
             </div>
           ) : (
-            messages.map((m, idx) => {
-              const isMine = (m.sender?._id || m.sender?.id || m.sender) === currentUserId;
-              const timeStr = m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            messages.map((m) => {
+              const senderId = String(m.sender?.id || m.sender?._id || m.sender_id || m.sender || '');
+              const isMine = senderId === currentUserId;
+              const timeStr = m.createdAt
+                ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '';
 
               return (
                 <div
-                  key={m._id || m.id || idx}
+                  key={m.id || m._id}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    alignItems: isMine ? 'flex-end' : 'flex-start'
+                    alignItems: isMine ? 'flex-end' : 'flex-start',
+                    maxWidth: '82%',
+                    alignSelf: isMine ? 'flex-end' : 'flex-start'
                   }}
                 >
                   <div
                     style={{
-                      maxWidth: '75%',
-                      padding: '9px 13px',
+                      backgroundColor: isMine ? '#DCF8C6' : '#ffffff', // WhatsApp green bubble for sender
+                      color: '#111827',
+                      padding: '8px 12px',
                       borderRadius: isMine ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
-                      backgroundColor: isMine ? '#047857' : '#ffffff',
-                      color: isMine ? '#ffffff' : '#0f172a',
-                      fontSize: '0.85rem',
+                      fontSize: '0.875rem',
                       lineHeight: 1.45,
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                      border: isMine ? 'none' : '1px solid #e2e8f0',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                       wordBreak: 'break-word'
                     }}
                   >
                     {m.text}
                   </div>
                   {timeStr && (
-                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '3px', padding: '0 4px' }}>
-                      {timeStr}
+                    <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '2px', padding: '0 4px' }}>
+                      {timeStr} {isMine && '✓✓'}
                     </span>
                   )}
                 </div>
               );
             })
           )}
-          <div ref={messagesEndRef} />
         </div>
 
-        {/* Quick Rapido Suggestion Chips */}
+        {/* Quick Suggestion Chips */}
         <div
           style={{
             padding: '8px 12px',
             backgroundColor: '#ffffff',
-            borderTop: '1px solid #f1f5f9',
+            borderTop: '1px solid #e2e8f0',
             display: 'flex',
             gap: '6px',
             overflowX: 'auto',
@@ -521,7 +603,7 @@ export const RapidoHandoverChatBox = ({
           }}
           style={{
             padding: '10px 14px',
-            backgroundColor: '#ffffff',
+            backgroundColor: '#f0f2f5',
             borderTop: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
@@ -532,42 +614,44 @@ export const RapidoHandoverChatBox = ({
             type="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Type a message to coordinate pickup..."
+            placeholder="Type a message (sends instantly)..."
             disabled={sending}
             maxLength={1000}
             style={{
               flex: 1,
-              padding: '8px 12px',
-              borderRadius: '10px',
+              minWidth: 0,
+              padding: '10px 14px',
+              borderRadius: '24px',
               border: '1.5px solid #cbd5e1',
-              fontSize: '0.85rem',
+              fontSize: '0.875rem',
               color: '#0f172a',
               outline: 'none',
+              backgroundColor: '#ffffff',
               transition: 'border-color 0.2s ease'
             }}
-            onFocus={(e) => (e.target.style.borderColor = '#047857')}
+            onFocus={(e) => (e.target.style.borderColor = '#075E54')}
             onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
           />
           <button
             type="submit"
             disabled={!text.trim() || sending}
             style={{
-              backgroundColor: text.trim() ? '#047857' : '#94a3b8',
+              backgroundColor: text.trim() ? '#075E54' : '#94a3b8',
               color: '#ffffff',
               border: 'none',
-              borderRadius: '10px',
-              padding: '8px 14px',
+              borderRadius: '50%',
+              width: '42px',
+              height: '42px',
               cursor: text.trim() ? 'pointer' : 'default',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
+              justifyContent: 'center',
               fontWeight: 700,
-              fontSize: '0.8rem',
+              flexShrink: 0,
               transition: 'background-color 0.15s ease'
             }}
           >
-            {sending ? <Spinner size="sm" /> : <Send size={15} />}
-            <span>Send</span>
+            {sending ? <Spinner size="sm" /> : <Send size={18} />}
           </button>
         </form>
 
@@ -580,69 +664,70 @@ export const RapidoHandoverChatBox = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '10px'
+            gap: '10px',
+            flexWrap: 'wrap'
           }}
         >
           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-            Handover done? Click below to conclude.
+            Handover done? Click below to delete chat & conclude.
           </div>
           <Button
             variant="primary"
             size="sm"
             iconLeft={CheckCircle2}
             onClick={() => setIsTakenModalOpen(true)}
-            style={{ fontSize: '0.78rem', padding: '6px 12px', backgroundColor: '#059669' }}
+            style={{ fontSize: '0.78rem', padding: '6px 14px', backgroundColor: '#059669', flexShrink: 0 }}
           >
             Mark as Taken
           </Button>
         </div>
       </div>
 
-      {/* Confirmation Modal to Mark as Taken & Delete Chat Messages */}
+      {/* Confirmation Modal: Mark as Taken & Permanently Delete Chat */}
       <Modal
         isOpen={isTakenModalOpen}
-        onClose={() => setIsTakenModalOpen(false)}
-        title="Mark Item as Taken?"
-        footer={
-          <>
+        onClose={() => !markingTaken && setIsTakenModalOpen(false)}
+        title="Confirm Item Handover"
+      >
+        <div style={{ padding: '0.5rem 0' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              padding: '14px',
+              borderRadius: '12px',
+              marginBottom: '1rem'
+            }}
+          >
+            <Trash2 size={24} color="#dc2626" style={{ flexShrink: 0 }} />
+            <div style={{ fontSize: '0.85rem', color: '#991b1b', lineHeight: 1.45 }}>
+              <strong>Permanent Privacy Notice:</strong> Marking this item as taken will conclude the handover and <strong>permanently delete all chat messages from the database</strong>. This action cannot be undone.
+            </div>
+          </div>
+
+          <p style={{ fontSize: '0.9rem', color: '#334155', margin: '0 0 1.25rem 0', lineHeight: 1.5 }}>
+            Have you met {partner?.name || 'the member'} and completed the physical handover of <strong>"{request?.item?.title || 'the item'}"</strong>?
+          </p>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
             <Button
-              variant="secondary"
-              onClick={() => setIsTakenModalOpen(false)}
+              variant="outline"
               disabled={markingTaken}
+              onClick={() => setIsTakenModalOpen(false)}
             >
               Cancel
             </Button>
             <Button
-              variant="primary"
+              variant="danger"
+              iconLeft={CheckCircle2}
               loading={markingTaken}
-              disabled={markingTaken}
               onClick={handleConfirmMarkTaken}
-              style={{ backgroundColor: '#059669' }}
             >
               Yes, Item Taken (Delete Chat)
             </Button>
-          </>
-        }
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <p style={{ margin: 0, fontSize: '0.9rem', color: '#334155', lineHeight: 1.5 }}>
-            Are you sure the item has been safely received/handed over?
-          </p>
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '10px',
-              display: 'flex',
-              gap: '10px',
-              alignItems: 'flex-start'
-            }}
-          >
-            <Trash2 size={18} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div style={{ fontSize: '0.8rem', color: '#991b1b', lineHeight: 1.45 }}>
-              <strong>Permanent Privacy Deletion:</strong> Marking this item as taken will conclude this exchange, immediately close this chat window, and <strong>permanently delete all messages</strong> between you and {partner?.name || 'the customer'} from the database.
-            </div>
           </div>
         </div>
       </Modal>

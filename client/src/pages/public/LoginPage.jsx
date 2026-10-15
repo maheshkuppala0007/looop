@@ -149,8 +149,35 @@ export const LoginPage = () => {
         throw new Error('Invalid email or password. Please try again.');
       }
 
-      // Credentials are confirmed correct! Sign in directly
-      handleAuthSuccess(loginResponse.user, loginResponse.token, loginResponse.user.name);
+      // Credentials are confirmed correct! Store pending session
+      setPendingSession({
+        user: loginResponse.user,
+        token: loginResponse.token
+      });
+
+      // 2. NOW AND ONLY NOW: Dispatch the 6-digit OTP code to the user's email via Brevo
+      try {
+        await authService.sendOtp(targetEmail, 'LOGIN_OTP');
+      } catch (otpErr) {
+        // If an OTP was already recently generated/active, proceed to verification screen
+        console.warn('sendOtp notice on login:', otpErr?.message);
+        if (otpErr?.response?.status !== 429) {
+          throw otpErr;
+        }
+      }
+
+      // 3. Switch to OTP verification screen
+      setLoginStep('otp');
+      setOtpDigits(['', '', '', '', '', '']);
+      setOtpCountdown(30);
+
+      addToast({
+        title: 'Verification Code Dispatched',
+        message: `Credentials verified! A 6-digit login verification code has been sent to ${targetEmail}.`,
+        variant: 'success'
+      });
+
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
     } catch (err) {
       // Credential failure or server rejection: DO NOT send email, show error message
       const errorMsg =
@@ -194,7 +221,7 @@ export const LoginPage = () => {
       // Successfully verified! Log in and redirect to dashboard
       handleAuthSuccess(finalUser, finalToken, finalUser.name);
     } catch (err) {
-      setServerError(err.message || 'Invalid or expired verification code. Please check your Brevo email and try again.');
+      setServerError(err.message || 'Invalid or expired verification code. Please check your email and try again.');
     } finally {
       setIsVerifyingOtp(false);
     }
@@ -208,16 +235,16 @@ export const LoginPage = () => {
 
     try {
       await authService.sendOtp(targetEmail, 'LOGIN_OTP');
-      setOtpCountdown(60);
+      setOtpCountdown(30);
       setOtpDigits(['', '', '', '', '', '']);
       addToast({
-        title: 'New Code Dispatched',
-        message: `A new 6-digit verification code has been dispatched to ${targetEmail} via Brevo Email.`,
+        title: 'New Code Sent',
+        message: `A new 6-digit verification code has been sent to ${targetEmail}.`,
         variant: 'info'
       });
       setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
     } catch (err) {
-      setServerError(err.message || 'Failed to dispatch verification code via Brevo Email.');
+      setServerError(err.message || 'Failed to dispatch verification code to your email.');
     } finally {
       setIsResendingOtp(false);
     }
@@ -365,7 +392,7 @@ export const LoginPage = () => {
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
             borderRadius: '24px',
-            padding: '2rem 1.5rem',
+            padding: 'clamp(1.5rem, 5vw, 2.25rem) clamp(1rem, 4vw, 1.5rem)',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
             color: '#0f172a',
             position: 'relative',
@@ -576,7 +603,7 @@ export const LoginPage = () => {
                     style={{ width: '100%', borderRadius: '12px' }}
                     iconRight={!isSubmitting ? ArrowRight : undefined}
                   >
-                    {isSubmitting ? 'Verifying Credentials...' : 'Sign In'}
+                    {isSubmitting ? 'Continuing...' : 'Continue'}
                   </Button>
                 </div>
               </form>
@@ -718,7 +745,7 @@ export const LoginPage = () => {
                   Enter 6-Digit OTP Code
                 </h2>
                 <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '6px', lineHeight: 1.5 }}>
-                  Credentials verified! A 6-digit login verification code was sent via <strong>Brevo Email</strong> to:
+                  Credentials verified! A 6-digit verification code has been sent to your email:
                 </p>
                 <div style={{
                   display: 'inline-block',
@@ -737,30 +764,47 @@ export const LoginPage = () => {
               </div>
 
               <form onSubmit={handleVerifyLoginOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: 'clamp(3px, 1.2vw, 6px)',
+                    width: '100%',
+                    maxWidth: '100%',
+                    margin: '0 auto',
+                    boxSizing: 'border-box',
+                    padding: '0 2px'
+                  }}
+                >
                   {otpDigits.map((digit, idx) => (
                     <input
                       key={idx}
                       ref={(el) => (otpInputRefs.current[idx] = el)}
                       type="text"
                       inputMode="numeric"
+                      pattern="[0-9]*"
                       maxLength={1}
                       value={digit}
                       onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                       onPaste={idx === 0 ? handleOtpPaste : undefined}
                       style={{
-                        width: '42px',
-                        height: '50px',
+                        flex: '1 1 0',
+                        width: '100%',
+                        maxWidth: '46px',
+                        minWidth: '28px',
+                        height: 'clamp(42px, 11vw, 50px)',
                         textAlign: 'center',
-                        fontSize: '1.35rem',
+                        fontSize: 'clamp(1.1rem, 4.2vw, 1.35rem)',
                         fontWeight: 800,
                         borderRadius: '10px',
-                        border: '2px solid #cbd5e1',
+                        border: digit ? '2px solid #059669' : '2px solid #cbd5e1',
                         backgroundColor: '#ffffff',
                         color: '#047857',
                         outline: 'none',
-                        boxSizing: 'border-box'
+                        boxSizing: 'border-box',
+                        padding: 0
                       }}
                     />
                   ))}
@@ -797,7 +841,7 @@ export const LoginPage = () => {
                       textDecoration: 'underline'
                     }}
                   >
-                    {isResendingOtp ? 'Sending...' : 'Resend Code via Brevo'}
+                    {isResendingOtp ? 'Sending...' : 'Resend Code'}
                   </button>
                 )}
               </div>

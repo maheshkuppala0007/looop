@@ -74,6 +74,11 @@ export const RequestDetails = () => {
     fetchRequest();
   }, [fetchRequest]);
 
+  useEffect(() => {
+    // Keep window at top when opening request details
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [id]);
+
   // Handle Accept
   const handleAccept = async () => {
     if (loadingAction) return;
@@ -222,14 +227,13 @@ export const RequestDetails = () => {
     );
   }
 
-  // Derive roles
-  const userId = user?.id || user?._id;
-  const isRequester =
-    request.requester &&
-    (request.requester._id === userId || request.requester.id === userId || request.requester.email === user?.email);
-  const isOwner =
-    request.owner &&
-    (request.owner._id === userId || request.owner.id === userId || request.owner.email === user?.email);
+  // Derive roles robustly
+  const cleanUserId = String(user?.id || user?._id || '');
+  const requesterId = String(request.requester?._id || request.requester?.id || request.requester_id || request.requester || '');
+  const ownerId = String(request.owner?._id || request.owner?.id || request.owner_id || request.owner || '');
+
+  const isRequester = Boolean(cleanUserId && (requesterId === cleanUserId || (request.requester?.email && user?.email && request.requester.email.toLowerCase() === user.email.toLowerCase())));
+  const isOwner = Boolean(cleanUserId && (ownerId === cleanUserId || (request.owner?.email && user?.email && request.owner.email.toLowerCase() === user.email.toLowerCase())));
 
   const status = (request.status || 'PENDING').toUpperCase();
   const targetItem = request.item || request.wantedItem;
@@ -298,7 +302,7 @@ export const RequestDetails = () => {
   const statusBanner = getStatusBannerContent();
 
   return (
-    <div style={{ maxWidth: '1050px', margin: '0 auto', paddingBottom: '4rem' }} className="request-details-page">
+    <div style={{ maxWidth: '1050px', width: '100%', margin: '0 auto', paddingBottom: '4rem', boxSizing: 'border-box' }} className="request-details-page">
       {/* 1. Breadcrumb */}
       <nav
         aria-label="Breadcrumb"
@@ -389,16 +393,18 @@ export const RequestDetails = () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1.8fr 1fr',
+          gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1fr)',
           gap: '1.5rem',
-          alignItems: 'start'
+          alignItems: 'start',
+          width: '100%',
+          minWidth: 0
         }}
         className="request-details-grid"
       >
         {/* ==================================================== */}
         {/* LEFT COLUMN: Main Request Information & Details      */}
         {/* ==================================================== */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0, width: '100%' }}>
           {/* 3. Status Banner */}
           <div
             style={{
@@ -580,8 +586,8 @@ export const RequestDetails = () => {
             )}
           </Card>
 
-          {/* Rapido-Style Fast Handover & Pickup Coordination Chat */}
-          {(isOwner || isRequester) && (
+          {/* Handover & Pickup Coordination - Only shown once request is mutually ACCEPTED */}
+          {request?.status === 'ACCEPTED' && (isOwner || isRequester) && (
             <div style={{ marginBottom: '1.25rem' }}>
               <RapidoHandoverChatBox
                 request={request}
@@ -785,7 +791,7 @@ export const RequestDetails = () => {
         {/* ==================================================== */}
         {/* RIGHT COLUMN: Actions & Status Management Panel      */}
         {/* ==================================================== */}
-        <div style={{ position: 'sticky', top: '2rem' }}>
+        <div style={{ position: 'sticky', top: '2rem', minWidth: 0, width: '100%' }} className="request-details-right-col">
           <RequestActions
             request={request}
             isOwner={isOwner}
@@ -799,9 +805,17 @@ export const RequestDetails = () => {
       </div>
 
       <style>{`
-        @media (max-width: 860px) {
+        @media (max-width: 1100px) {
           .request-details-grid {
             grid-template-columns: 1fr !important;
+          }
+          .request-details-right-col {
+            position: static !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .request-details-page {
+            padding-bottom: 2rem !important;
           }
         }
       `}</style>

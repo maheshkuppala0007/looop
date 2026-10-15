@@ -42,7 +42,6 @@ export const AdminUsersPage = () => {
       const parsed = cached ? JSON.parse(cached) : [];
       if (parsed.length > 0) {
         persistentUsers = parsed;
-        usersAlreadyLoaded = true;
         return parsed;
       }
     } catch {}
@@ -52,9 +51,9 @@ export const AdminUsersPage = () => {
     if (persistentTotal > 0) return persistentTotal;
     try {
       const cached = localStorage.getItem('looop_admin_users_total');
-      return cached ? parseInt(cached, 10) : 4;
+      return cached ? parseInt(cached, 10) : 0;
     } catch {
-      return 4;
+      return 0;
     }
   });
   const [totalPages, setTotalPages] = useState(() => persistentTotalPages || 1);
@@ -67,13 +66,13 @@ export const AdminUsersPage = () => {
     if (persistentRoleCounts) return persistentRoleCounts;
     try {
       const cached = localStorage.getItem('looop_admin_users_counts');
-      return cached ? JSON.parse(cached) : { all: 4, customers: 0, admins: 4, active: 4, suspended: 0 };
+      return cached ? JSON.parse(cached) : { all: 0, customers: 0, admins: 0, active: 0, suspended: 0 };
     } catch {
-      return { all: 4, customers: 0, admins: 4, active: 4, suspended: 0 };
+      return { all: 0, customers: 0, admins: 0, active: 0, suspended: 0 };
     }
   });
   const [isLoading, setIsLoading] = useState(() => {
-    if (usersAlreadyLoaded || (persistentUsers && persistentUsers.length > 0)) {
+    if (persistentUsers && persistentUsers.length > 0) {
       return false;
     }
     return true;
@@ -144,21 +143,16 @@ export const AdminUsersPage = () => {
     }
   }, [page, limit, search, roleFilter, statusFilter]);
 
-  // Initial load and live background polling (checks every 10s for new registrations/logins)
+  // SWR: Render cached data immediately, but ALWAYS fetch live database users on mount!
   useEffect(() => {
-    const isDefaultView = page === 1 && !search && !roleFilter && !statusFilter;
-    if (usersAlreadyLoaded && persistentUsers && persistentUsers.length > 0 && isDefaultView) {
-      // STRICTLY DO NOT RELOAD WHEN RETURNING FROM ANOTHER SECTION
-      setIsLoading(false);
-    } else {
-      fetchUsers(usersAlreadyLoaded);
-    }
+    const hasCache = !!(persistentUsers && persistentUsers.length > 0);
+    fetchUsers(hasCache);
 
     const interval = setInterval(() => {
       fetchUsers(true);
-    }, 10000);
+    }, 5000);
     return () => clearInterval(interval);
-  }, [fetchUsers, page, search, roleFilter, statusFilter]);
+  }, [fetchUsers, page, limit, search, roleFilter, statusFilter]);
 
   const handleOpenDetails = async (user) => {
     setSelectedUser(user);

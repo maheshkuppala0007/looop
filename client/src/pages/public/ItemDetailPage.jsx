@@ -213,13 +213,10 @@ export const ItemDetailPage = () => {
         setRequestModalOpen(false);
         addToast({
           title: 'Request Sent Successfully!',
-          message: `Your details and location were emailed to ${item.owner?.name || 'the owner'}. Opening pickup coordination chat...`,
+          message: `Your reuse request for "${item.title || 'this item'}" has been sent to ${item.owner?.name || 'the owner'}. You will receive a notification when they respond.`,
           variant: 'success'
         });
-        const reqId = result.request?._id || result.request?.id;
-        if (reqId) {
-          navigate(`/requests/${reqId}`);
-        }
+        navigate('/requests');
       } else {
         throw new Error(result?.message || 'Failed to submit request to server.');
       }

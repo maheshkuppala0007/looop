@@ -1313,28 +1313,30 @@ exports.getRequests = async (req, res) => {
       ]);
 
       const total = countRes?.rows?.[0]?.total || 0;
-      const requests = (dataRes?.rows || []).map(r => ({
-        _id: r.id,
-        id: r.id,
-        type: r.type,
-        message: r.message,
-        status: r.status,
-        createdAt: r.createdAt,
-        item: r.item,
-        requester: r.requester,
-        owner: r.owner
-      }));
+      if (total > 0) {
+        const requests = (dataRes?.rows || []).map(r => ({
+          _id: r.id,
+          id: r.id,
+          type: r.type,
+          message: r.message,
+          status: r.status,
+          createdAt: r.createdAt,
+          item: r.item,
+          requester: r.requester,
+          owner: r.owner
+        }));
 
-      return res.status(200).json({
-        success: true,
-        data: {
-          requests,
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit) || 1
-        }
-      });
+        return res.status(200).json({
+          success: true,
+          data: {
+            requests,
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit) || 1
+          }
+        });
+      }
     } catch (pgErr) {
       console.warn('[Admin getRequests] PostgreSQL error, checking Mongo:', pgErr.message);
     }

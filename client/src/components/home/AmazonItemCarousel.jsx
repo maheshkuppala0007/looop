@@ -124,7 +124,7 @@ export const AmazonItemCarousel = ({ items = [] }) => {
             ref={carouselRef}
             style={{
               display: 'flex',
-              transform: `translateX(-${currentIndex * (100 / itemsPerPage)}%)`,
+              transform: `translateX(calc(-${currentIndex} * (${100 / itemsPerPage}% + ${1.25 / itemsPerPage}rem)))`,
               transition: 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)',
               gap: '1.25rem',
               justifyContent: totalItems <= 2 ? 'flex-start' : 'initial'
@@ -132,8 +132,8 @@ export const AmazonItemCarousel = ({ items = [] }) => {
           >
             {displayItems.map((item) => {
               const itemImg = Array.isArray(item.images) && item.images.length > 0
-                ? (typeof item.images[0] === 'string' ? item.images[0] : item.images[0].url)
-                : 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80';
+                ? (typeof item.images[0] === 'string' ? item.images[0] : (item.images[0]?.url || ''))
+                : '';
 
               const flexBasis = totalItems === 1
                 ? 'min(100%, 360px)'
@@ -167,21 +167,25 @@ export const AmazonItemCarousel = ({ items = [] }) => {
                     onClick={() => navigate(`/items/${item.id || item._id}`)}
                   >
                     {/* Item Image Box */}
-                    <div style={{ position: 'relative', width: '100%', height: '210px', backgroundColor: 'var(--color-slate-100)', overflow: 'hidden' }}>
-                      <img
-                        src={itemImg}
-                        alt={item.title}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          transition: 'transform 0.35s ease'
-                        }}
-                        className="amazon-card-img"
-                        onError={(e) => {
-                          e.target.src = 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80';
-                        }}
-                      />
+                    <div style={{ position: 'relative', width: '100%', height: '210px', backgroundColor: 'var(--color-slate-100)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {itemImg ? (
+                        <img
+                          src={itemImg}
+                          alt={item.title}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            transition: 'transform 0.35s ease'
+                          }}
+                          className="amazon-card-img"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <span style={{ color: 'var(--color-slate-400)', fontSize: '0.8rem', fontWeight: 600 }}>No Photo</span>
+                      )}
                       <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
                         <Badge variant={getSharingBadgeVariant(item.sharingType)}>
                           {formatSharingType(item.sharingType)}

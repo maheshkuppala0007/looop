@@ -198,7 +198,7 @@ export const adminService = {
             admin: {
               name: 'Mahesh Kuppala',
               email: 'maheshkuppala321@gmail.com',
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
+              avatar: ''
             }
           }
         ]

@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, HelpCircle, Menu, X, ArrowRight, User, LogOut } from 'lucide-react';
+import { Search, HelpCircle, Menu, X, ArrowRight, User, LogOut, Bell } from 'lucide-react';
 import Button from '../common/Button';
 import LooopLogo from '../common/LooopLogo';
 import LocationBadge from '../location/LocationBadge';
 import { useAuth } from '../../context/AuthContext';
 import { useSiteConfig } from '../../context/SiteConfigContext';
+import { useNotification } from '../../context/NotificationContext';
 
 export const Navbar = () => {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
-  const { siteConfig } = useSiteConfig();
+  const { siteConfig } = useSiteConfig?.() || {};
+  const { unreadCount = 0 } = useNotification?.() || {};
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -129,29 +131,81 @@ export const Navbar = () => {
           })}
         </nav>
 
-        {/* Right Section: Location Badge & Auth Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <LocationBadge />
+        {/* Right Section: Location Badge, Notifications & Auth Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div className="navbar-location-container">
+            <LocationBadge />
+          </div>
 
           {isAuthenticated ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              {/* Real-time Notification Bell */}
               <Link
-                to={user?.role === 'admin' || user?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard'}
-                style={{ textDecoration: 'none' }}
+                to="/notifications"
+                title="Notifications"
+                aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+                style={{
+                  position: 'relative',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: '1px solid var(--color-slate-200)',
+                  backgroundColor: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: unreadCount > 0 ? '#059669' : 'var(--color-slate-600)',
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease',
+                  flexShrink: 0
+                }}
+                className="navbar-bell-btn"
               >
-                <Button variant="secondary" size="sm" iconLeft={User}>
-                  {user?.name ? user.name.split(' ')[0] : 'Dashboard'}
-                </Button>
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '-2px',
+                      right: '-2px',
+                      minWidth: '17px',
+                      height: '17px',
+                      padding: '0 3px',
+                      borderRadius: '9999px',
+                      backgroundColor: '#10b981',
+                      color: '#ffffff',
+                      fontSize: '0.65rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 0 2px #ffffff'
+                    }}
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </Link>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={logout}
-                title="Log out"
-                style={{ color: '#ef4444', padding: '6px 10px' }}
-              >
-                <LogOut size={16} />
-              </Button>
+
+              <div className="navbar-desktop-auth" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Link
+                  to={user?.role === 'admin' || user?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard'}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Button variant="secondary" size="sm" iconLeft={User}>
+                    {user?.name ? user.name.split(' ')[0] : 'Dashboard'}
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={logout}
+                  title="Log out"
+                  style={{ color: '#ef4444', padding: '6px 10px' }}
+                >
+                  <LogOut size={16} />
+                </Button>
+              </div>
             </div>
           ) : (
             <Link to="/login" style={{ textDecoration: 'none' }}>
@@ -234,6 +288,42 @@ export const Navbar = () => {
             {isAuthenticated ? (
               <>
                 <Link
+                  to="/notifications"
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'var(--color-primary-50)',
+                    color: 'var(--color-primary-800)',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    fontSize: '0.95rem'
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Bell size={18} color="var(--color-primary-600)" />
+                    <span>Notifications</span>
+                  </span>
+                  {unreadCount > 0 && (
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        backgroundColor: '#10b981',
+                        color: '#ffffff',
+                        fontSize: '0.75rem',
+                        fontWeight: 800
+                      }}
+                    >
+                      {unreadCount}
+                    </span>
+                  )}
+                </Link>
+
+                <Link
                   to={user?.role === 'admin' || user?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard'}
                   onClick={() => setMobileMenuOpen(false)}
                   style={{ textDecoration: 'none' }}
@@ -275,7 +365,15 @@ export const Navbar = () => {
           .desktop-nav { display: none !important; }
           .mobile-toggle-btn { display: block !important; }
         }
+        @media (max-width: 768px) {
+          .navbar-location-container { display: none !important; }
+          .navbar-desktop-auth { display: none !important; }
+        }
         .nav-link:hover {
+          color: var(--color-primary-600) !important;
+        }
+        .navbar-bell-btn:hover {
+          border-color: var(--color-primary-400) !important;
           color: var(--color-primary-600) !important;
         }
       `}</style>

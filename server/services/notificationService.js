@@ -176,107 +176,94 @@ class NotificationService {
       // Determine authoritative category
       const category = explicitCategory || TYPE_TO_CATEGORY[type] || 'SYSTEM';
 
-      // 1. Deduplication Strategy
-      // A. If dedupeKey is provided, check for existing notification
-      if (dedupeKey) {
-        const existingByDedupe = await Notification.findOne({
-          recipient: normalizedRecipient,
-          dedupeKey,
-          deletedAt: null
-        });
-        if (existingByDedupe) {
-          return existingByDedupe;
-        }
-      }
-
-      // B. Burst protection: prevent identical type + recipient + relatedEntityId within 5s
-      if (normalizedEntityId) {
-        const fiveSecondsAgo = new Date(Date.now() - 5000);
-        const existingBurst = await Notification.findOne({
-          recipient: normalizedRecipient,
+      // 1. Persist Notification in Neon PostgreSQL
+      const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      try {
+        const { query: pgQuery } = require('../config/postgres');
+        await pgQuery(`
+          INSERT INTO notifications (
+            id, recipient_id, actor_id, type, category, title, message, link, dedupe_key,
+            related_entity_type, related_entity_id, related_item_id, related_wanted_item_id,
+            related_request_id, related_transaction_id, related_conversation_id, is_read, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, false, NOW(), NOW())
+          ON CONFLICT (id) DO NOTHING;
+        `, [
+          notifId,
+          String(normalizedRecipient),
+          normalizedActor ? String(normalizedActor) : null,
           type,
-          relatedEntityId: normalizedEntityId,
-          createdAt: { $gte: fiveSecondsAgo },
-          deletedAt: null
-        });
-        if (existingBurst) {
-          return existingBurst;
-        }
+          category,
+          title,
+          message,
+          link,
+          dedupeKey,
+          relatedEntityType,
+          normalizedEntityId ? String(normalizedEntityId) : null,
+          normalizedItem ? String(normalizedItem) : null,
+          normalizedWanted ? String(normalizedWanted) : null,
+          normalizedRequest ? String(normalizedRequest) : null,
+          normalizedTransaction ? String(normalizedTransaction) : null,
+          normalizedConversation ? String(normalizedConversation) : null
+        ]);
+      } catch (pgNotifErr) {
+        console.warn('[NotificationService] PostgreSQL save notice:', pgNotifErr.message);
       }
 
-      // 2. Preference-Aware Delivery Check
-      // Essential security/account notifications CANNOT be suppressed
-      const isSecurityOrEssential = category === 'ACCOUNT' || type === 'SECURITY_ALERT';
-
-      let inQuietHours = false;
-      if (!isSecurityOrEssential) {
-        const preferences = await this.getPreferences(normalizedRecipient);
-        if (preferences) {
-          // Check global in-app delivery toggle
-          if (preferences.inApp === false) {
-            return null;
-          }
-
-          // Check category preference
-          const prefKey = CATEGORY_TO_PREF_KEY[category];
-          if (prefKey && preferences.categories && preferences.categories[prefKey] === false) {
-            return null; // Suppressed by user preference
-          }
-
-          // Check quiet hours
-          if (preferences.quietHours) {
-            inQuietHours = isCurrentTimeInQuietHours(preferences.quietHours);
-          }
-        }
-      }
-
-      // 3. Persist Notification in MongoDB
-      const notification = new Notification({
-        recipient: normalizedRecipient,
-        actor: normalizedActor,
-        type,
-        category,
-        title,
-        message,
-        link,
-        dedupeKey,
-        relatedEntityType,
-        relatedEntityId: normalizedEntityId,
-        relatedItem: normalizedItem,
-        relatedWantedItem: normalizedWanted,
-        relatedRequest: normalizedRequest,
-        relatedTransaction: normalizedTransaction,
-        relatedConversation: normalizedConversation,
-        isRead: false
-      });
-
-      await notification.save();
-
-      // Populate actor and item summary for real-time payload
-      await notification.populate([
-        { path: 'actor', select: 'name avatar trustScore rating' },
-        { path: 'relatedItem', select: 'title images category sharingType' }
-      ]);
-
-      const formatted = {
-        ...notification.toObject(),
-        id: notification._id
-      };
-
-      // 4. Real-time dispatch via Socket.IO
-      // If within quiet hours and not security, skip toast or suppress audio/toast
+      // 2. Real-time dispatch via Socket.IO
       const io = getIO();
-      if (io) {
-        io.to(`user:${recipient.toString()}`).emit('new_notification', {
-          notification: formatted,
-          quietHoursSuppressed: inQuietHours && !isSecurityOrEssential
+      if (io && normalizedRecipient) {
+        const targetUserId = normalizedRecipient.toString();
+        io.to(`user:${targetUserId}`).emit('new_notification', {
+          notification: {
+            id: notifId,
+            _id: notifId,
+            recipient: targetUserId,
+            actor: normalizedActor ? { id: normalizedActor } : null,
+            type,
+            category,
+            title,
+            message,
+            link,
+            isRead: false,
+            createdAt: new Date()
+          },
+          quietHoursSuppressed: false
         });
+        io.to(`user:${targetUserId}`).emit('notification_count_updated', {
+          recipient: targetUserId
+        });
+      }
+
+      // 3. Persist Notification in MongoDB if connected
+      let notification = { id: notifId, _id: notifId, type, category, title, message };
+      if (mongoose.connection?.readyState === 1) {
+        try {
+          const mNotif = new Notification({
+            recipient: normalizedRecipient,
+            actor: normalizedActor,
+            type,
+            category,
+            title,
+            message,
+            link,
+            dedupeKey,
+            relatedEntityType,
+            relatedEntityId: normalizedEntityId,
+            relatedItem: normalizedItem,
+            relatedWantedItem: normalizedWanted,
+            relatedRequest: normalizedRequest,
+            relatedTransaction: normalizedTransaction,
+            relatedConversation: normalizedConversation,
+            isRead: false
+          });
+          await mNotif.save();
+          notification = mNotif;
+        } catch {}
       }
 
       return notification;
     } catch (error) {
       console.error('[NotificationService] Error creating notification:', error.message);
-      // Main business operations must remain resilient and not fail
       return null;
     }
   }

@@ -104,7 +104,7 @@ export const AdminLoginPage = () => {
       setOtpCountdown(60);
       addToast({
         title: 'Admin Verification Code Sent',
-        message: `A 6-digit OTP security code has been dispatched to ${cleanEmail} via Brevo Email.`,
+        message: `A 6-digit OTP security code has been sent to ${cleanEmail}.`,
         variant: 'info'
       });
       setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
@@ -305,7 +305,7 @@ export const AdminLoginPage = () => {
             backgroundColor: 'rgba(6, 78, 59, 0.95)',
             border: '1.5px solid rgba(52, 211, 153, 0.35)',
             borderRadius: '24px',
-            padding: '2.25rem 1.75rem',
+            padding: 'clamp(1.5rem, 5vw, 2.25rem) clamp(1rem, 4vw, 1.75rem)',
             boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 30px rgba(52, 211, 153, 0.15)',
             color: '#ffffff',
             position: 'relative',
@@ -440,7 +440,7 @@ export const AdminLoginPage = () => {
 
               <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
                 <p style={{ fontSize: '0.85rem', color: '#cbd5e1', margin: '0 0 8px 0' }}>
-                  A 6-digit security code has been sent via <strong>Brevo Email</strong> to:
+                  A 6-digit security code has been sent to your email:
                 </p>
                 <div
                   style={{
@@ -460,29 +460,47 @@ export const AdminLoginPage = () => {
               </div>
 
               <form onSubmit={handleOtpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: 'clamp(3px, 1.2vw, 6px)',
+                    width: '100%',
+                    maxWidth: '100%',
+                    margin: '0 auto',
+                    boxSizing: 'border-box',
+                    padding: '0 2px'
+                  }}
+                >
                   {otpDigits.map((digit, idx) => (
                     <input
                       key={idx}
                       ref={(el) => (otpInputRefs.current[idx] = el)}
                       type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       maxLength={1}
                       value={digit}
                       onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                       onPaste={idx === 0 ? handleOtpPaste : undefined}
                       style={{
-                        width: '42px',
-                        height: '50px',
+                        flex: '1 1 0',
+                        width: '100%',
+                        maxWidth: '46px',
+                        minWidth: '28px',
+                        height: 'clamp(42px, 11vw, 50px)',
                         textAlign: 'center',
-                        fontSize: '1.35rem',
+                        fontSize: 'clamp(1.1rem, 4.2vw, 1.35rem)',
                         fontWeight: 800,
                         borderRadius: '10px',
-                        border: '2px solid rgba(52, 211, 153, 0.4)',
+                        border: digit ? '2px solid #34d399' : '2px solid rgba(52, 211, 153, 0.4)',
                         backgroundColor: 'rgba(255, 255, 255, 0.95)',
                         color: '#064e3b',
                         outline: 'none',
-                        boxSizing: 'border-box'
+                        boxSizing: 'border-box',
+                        padding: 0
                       }}
                     />
                   ))}
@@ -574,7 +592,7 @@ export const AdminLoginPage = () => {
                       textDecoration: 'underline'
                     }}
                   >
-                    {isSendingOtp ? 'Sending...' : 'Resend Code via Brevo'}
+                    {isSendingOtp ? 'Sending...' : 'Resend Code'}
                   </button>
                 )}
               </div>

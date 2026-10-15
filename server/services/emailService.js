@@ -209,7 +209,37 @@ async function dispatchEmail({
     };
   }
 
-  // 3. Create Outbox Record
+  // 3. For essential OTP / security emails: Dispatch via Brevo IMMEDIATELY without waiting on DB outbox roundtrips
+  if (isEssential) {
+    const { subject, html } = renderEmailTemplate(templateKey, templateData, recipientName);
+
+    // Asynchronously log to outbox in background
+    createOutboxRecord({
+      eventType,
+      deduplicationKey,
+      recipientUserId,
+      recipientEmail,
+      templateKey,
+      templateData
+    }).then(async ({ record }) => {
+      if (record?.id) {
+        await updateOutboxRecord(record.id, { status: 'ACCEPTED_BY_PROVIDER', attemptCount: 1 }).catch(() => {});
+      }
+    }).catch(() => {});
+
+    // Direct, instant dispatch to Brevo
+    const result = await getActiveProvider().sendTransactionalEmail({
+      toEmail: recipientEmail,
+      recipientName,
+      subject,
+      htmlContent: html,
+      templateKey
+    });
+
+    return result;
+  }
+
+  // 3. Create Outbox Record for standard notifications
   const { isDuplicate, record: outboxRecord } = await createOutboxRecord({
     eventType,
     deduplicationKey,

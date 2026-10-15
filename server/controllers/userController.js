@@ -108,7 +108,7 @@ exports.getMe = async (req, res) => {
         const pgUser = pgUserRes.rows[0];
         const targetId = pgUser.id;
 
-        // Fetch real Neon PG counts concurrently
+        // Fetch real Neon PG counts concurrently with individual catch protection
         const [
           activeItemsRes,
           itemsSharedRes,
@@ -117,12 +117,12 @@ exports.getMe = async (req, res) => {
           reviewsRes,
           reviewAggRes
         ] = await Promise.all([
-          pgQuery("SELECT COUNT(*)::int as count FROM items WHERE owner_id = $1 AND (availability = 'Available' OR status = 'active');", [targetId]),
-          pgQuery("SELECT COUNT(*)::int as count FROM items WHERE owner_id = $1;", [targetId]),
-          pgQuery("SELECT COUNT(*)::int as count FROM transactions WHERE (owner_id = $1 OR recipient_id = $1) AND status = 'COMPLETED';", [targetId]),
-          pgQuery("SELECT COUNT(*)::int as count FROM wanted_items WHERE user_id = $1;", [targetId]),
-          pgQuery("SELECT COUNT(*)::int as count FROM reviews WHERE reviewee_id = $1;", [targetId]),
-          pgQuery("SELECT COALESCE(ROUND(AVG(rating)::numeric, 1), 0)::float as avg_rating, COUNT(*)::int as count FROM reviews WHERE reviewee_id = $1;", [targetId])
+          pgQuery("SELECT COUNT(*)::int as count FROM items WHERE owner_id = $1 AND (availability = 'Available' OR status = 'active');", [targetId]).catch(() => ({ rows: [{ count: 0 }] })),
+          pgQuery("SELECT COUNT(*)::int as count FROM items WHERE owner_id = $1;", [targetId]).catch(() => ({ rows: [{ count: 0 }] })),
+          pgQuery("SELECT COUNT(*)::int as count FROM transactions WHERE (owner_id = $1 OR recipient_id = $1) AND status = 'COMPLETED';", [targetId]).catch(() => ({ rows: [{ count: 0 }] })),
+          pgQuery("SELECT COUNT(*)::int as count FROM wanted_items WHERE requester_id = $1;", [targetId]).catch(() => ({ rows: [{ count: 0 }] })),
+          pgQuery("SELECT COUNT(*)::int as count FROM reviews WHERE reviewee_id = $1;", [targetId]).catch(() => ({ rows: [{ count: 0 }] })),
+          pgQuery("SELECT COALESCE(ROUND(AVG(rating)::numeric, 1), 0)::float as avg_rating, COUNT(*)::int as count FROM reviews WHERE reviewee_id = $1;", [targetId]).catch(() => ({ rows: [{ avg_rating: 0, count: 0 }] }))
         ]);
 
         const activeItemsCount = activeItemsRes?.rows?.[0]?.count || 0;
@@ -171,12 +171,18 @@ exports.getMe = async (req, res) => {
       console.warn('[userController] getMe PG notice:', pgErr.message);
     }
 
-    // 2. Fallback to MongoDB
-    if (mongoose.Types.ObjectId.isValid(userId)) {
-      user = await User.findById(userId).select('-password');
-    }
-    if (!user && userEmail) {
-      user = await User.findOne({ email: userEmail }).select('-password');
+    // 2. Fallback to MongoDB only if active
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      try {
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+          user = await User.findById(userId).select('-password');
+        }
+        if (!user && userEmail) {
+          user = await User.findOne({ email: userEmail }).select('-password');
+        }
+      } catch (mErr) {
+        console.warn('[userController] getMe Mongo notice:', mErr.message);
+      }
     }
 
     if (!user) {
@@ -276,17 +282,17 @@ exports.updateMe = async (req, res) => {
     try {
       const updateRes = await pgQuery(
         `UPDATE users
-         SET name = COALESCE($1, name),
-             bio = COALESCE($2, bio),
-             city = COALESCE($3, city),
-             locality = COALESCE($4, locality),
-             state = COALESCE($5, state),
-             avatar = COALESCE($6, avatar)
-         WHERE id = $7 OR email = $8
+         SET name = COALESCE($1::text, name),
+             bio = COALESCE($2::text, bio),
+             city = COALESCE($3::text, city),
+             locality = COALESCE($4::text, locality),
+             state = COALESCE($5::text, state),
+             avatar = CASE WHEN $6::text IS NOT NULL THEN $6::text ELSE avatar END
+         WHERE id = $7::text OR email = $8::text
          RETURNING id, name, email, role, avatar, bio, city, locality, state,
                    account_status AS "accountStatus", trust_score AS "trustScore",
                    rating, reviews_count AS "reviewsCount", verified, created_at AS "createdAt";`,
-        [cleanName, cleanBio, cleanCity, cleanLocality, cleanState, cleanAvatar, userId || '', userEmail || '']
+        [cleanName || null, cleanBio || null, cleanCity || null, cleanLocality || null, cleanState || null, cleanAvatar !== undefined ? cleanAvatar : null, userId || '', userEmail || '']
       );
 
       if (updateRes?.rows?.[0]) {
@@ -298,11 +304,13 @@ exports.updateMe = async (req, res) => {
 
     // 2. Also Update Mongo User if exists
     let mongoUser = null;
-    if (mongoose.Types.ObjectId.isValid(userId)) {
-      mongoUser = await User.findById(userId);
-    }
-    if (!mongoUser && userEmail) {
-      mongoUser = await User.findOne({ email: userEmail });
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        mongoUser = await User.findById(userId);
+      }
+      if (!mongoUser && userEmail) {
+        mongoUser = await User.findOne({ email: userEmail });
+      }
     }
 
     if (mongoUser) {
@@ -311,7 +319,7 @@ exports.updateMe = async (req, res) => {
       if (cleanCity) mongoUser.city = cleanCity;
       if (cleanLocality) mongoUser.locality = cleanLocality;
       if (cleanState) mongoUser.state = cleanState;
-      if (cleanAvatar) mongoUser.avatar = cleanAvatar;
+      if (cleanAvatar !== undefined) mongoUser.avatar = cleanAvatar;
       if (interests && Array.isArray(interests)) {
         mongoUser.interests = interests.map(i => sanitizeText(i)).filter(i => i.length > 0).slice(0, 15);
       }
@@ -361,7 +369,77 @@ exports.updateMe = async (req, res) => {
     console.error('Error in updateMe:', error);
     return res.status(500).json({
       success: false,
-      message: 'Unable to update profile.'
+      message: 'Unable to update profile. Please try again.'
+    });
+  }
+};
+
+/**
+ * 3. Upload Profile Photo (WhatsApp DP Model)
+ * POST /api/users/me/avatar
+ */
+exports.uploadAvatar = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    const userEmail = req.user?.email;
+
+    if (!userId && !userEmail) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    let avatarUrl = '';
+    if (req.file) {
+      avatarUrl = `/uploads/${req.file.filename}`;
+    } else if (req.body?.avatar) {
+      avatarUrl = String(req.body.avatar).trim();
+    } else {
+      return res.status(400).json({ success: false, message: 'No image file provided for profile photo.' });
+    }
+
+    // 1. Update Neon PostgreSQL Database
+    let updatedPgUser = null;
+    try {
+      const updateRes = await pgQuery(
+        `UPDATE users
+         SET avatar = $1, updated_at = NOW()
+         WHERE id = $2 OR email = $3
+         RETURNING id, name, email, role, avatar, bio, city, locality, state,
+                   account_status AS "accountStatus", trust_score AS "trustScore",
+                   rating, reviews_count AS "reviewsCount", verified, created_at AS "createdAt";`,
+        [avatarUrl, userId || '', userEmail || '']
+      );
+
+      if (updateRes?.rows?.[0]) {
+        updatedPgUser = updateRes.rows[0];
+      }
+    } catch (pgErr) {
+      console.warn('[userController] uploadAvatar PG notice:', pgErr.message);
+    }
+
+    // 2. Also Update Mongo User if active
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      try {
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+          await User.findByIdAndUpdate(userId, { avatar: avatarUrl });
+        } else if (userEmail) {
+          await User.findOneAndUpdate({ email: userEmail }, { avatar: avatarUrl });
+        }
+      } catch (mErr) {
+        console.warn('[userController] uploadAvatar Mongo notice:', mErr.message);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile photo updated successfully.',
+      avatar: avatarUrl,
+      user: updatedPgUser || { id: userId, avatar: avatarUrl }
+    });
+  } catch (error) {
+    console.error('Error in uploadAvatar:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to upload profile photo.'
     });
   }
 };
@@ -450,7 +528,7 @@ exports.getPublicProfile = async (req, res) => {
     }
 
     // 2. Fallback to MongoDB
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!mongoose.connection || mongoose.connection.readyState !== 1 || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 

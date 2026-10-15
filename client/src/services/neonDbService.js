@@ -130,7 +130,7 @@ export const neonDb = {
       user.role === 'ADMIN';
 
     const role = isAdmin ? 'admin' : (user.role?.toLowerCase() || 'customer');
-    const avatar = user.avatar || user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80';
+    const avatar = (user.avatar && !user.avatar.includes('unsplash.com')) ? user.avatar : (user.photoURL && !user.photoURL.includes('unsplash.com') ? user.photoURL : '');
     const userId = user.id || user._id || user.uid || `usr_${Date.now()}`;
     const bio = user.bio || '';
     const phone = user.phone || user.number || '';
@@ -195,9 +195,10 @@ export const neonDb = {
   updatePassword: async (email, newPassword) => {
     if (!email || !newPassword) return false;
     const cleanEmail = email.toLowerCase().trim();
-    const sql = 'UPDATE users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(email) = $2 RETURNING id, email;';
+    const cleanPass = String(newPassword);
+    const sql = 'UPDATE users SET password = $1, plain_password = $2, updated_at = CURRENT_TIMESTAMP WHERE LOWER(email) = $3 RETURNING id, email;';
     try {
-      const res = await neonDb.query(sql, [newPassword, cleanEmail]);
+      const res = await neonDb.query(sql, [cleanPass, cleanPass, cleanEmail]);
       if (res.rows && res.rows.length > 0) {
         console.log(`[Neon DB Password Reset] Updated password in PostgreSQL for ${cleanEmail}`);
         return true;
@@ -262,7 +263,7 @@ export const neonDb = {
               freshEmail,
               '$2a$10$abcdefghijklmnopqrstuv',
               uRole,
-              currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
+              (currentUser?.avatar && !currentUser.avatar.includes('unsplash.com')) ? currentUser.avatar : ''
             ]
           );
           if (insUser.rows && insUser.rows.length > 0) {
@@ -307,9 +308,7 @@ export const neonDb = {
           };
         }).filter(img => img.url);
       }
-      if (formattedImages.length === 0) {
-        formattedImages = [{ url: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80', isPrimary: true, caption: '' }];
-      }
+
 
       const rawCity = itemData.location?.city || (typeof itemData.location === 'string' ? itemData.location.split(',')[0] : 'Bengaluru');
       const city = String(rawCity || '').trim().substring(0, 100);
@@ -602,8 +601,8 @@ export function mapRowToItem(row) {
   } catch {
     parsedImages = [];
   }
-  if (!Array.isArray(parsedImages) || parsedImages.length === 0) {
-    parsedImages = [{ url: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80', isPrimary: true }];
+  if (!Array.isArray(parsedImages)) {
+    parsedImages = [];
   }
 
   const normalizedImages = parsedImages.map((img, idx) => {
@@ -662,7 +661,7 @@ export function mapRowToItem(row) {
       id: row.owner_id,
       _id: row.owner_id,
       name: row.owner_name || 'LOOOP Member',
-      avatar: row.owner_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+      avatar: (row.owner_avatar && !row.owner_avatar.includes('unsplash.com')) ? row.owner_avatar : '',
       email: row.owner_email || '',
       city: row.owner_city || city,
       locality: row.owner_locality || locality,

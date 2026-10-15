@@ -3,6 +3,7 @@ import { X, Save, AlertCircle, Plus, Check } from 'lucide-react';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 import Spinner from '../common/Spinner';
+import WhatsAppDpUploader from './WhatsAppDpUploader';
 import { userService } from '../../services/userService';
 
 /**
@@ -16,6 +17,7 @@ export const EditProfileModal = ({
   onSuccess
 }) => {
   const [name, setName] = useState(user?.name || '');
+  const [avatar, setAvatar] = useState(user?.avatar || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [city, setCity] = useState(user?.city || '');
   const [locality, setLocality] = useState(user?.locality || '');
@@ -52,6 +54,7 @@ export const EditProfileModal = ({
     try {
       const payload = {
         name: name.trim(),
+        avatar,
         bio: bio.trim(),
         city: city.trim(),
         locality: locality.trim(),
@@ -98,6 +101,19 @@ export const EditProfileModal = ({
           <span>Account Email: <strong>{user?.email}</strong></span>
           <span style={{ fontSize: '0.72rem', color: 'var(--color-slate-400)', fontWeight: 600 }}>
             Read-only
+          </span>
+        </div>
+
+        {/* WhatsApp-Style DP Photo Manager */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0.5rem 0' }}>
+          <WhatsAppDpUploader
+            currentAvatar={avatar}
+            userName={name || user?.name}
+            size="2xl"
+            onAvatarUpdated={(newAvatar) => setAvatar(newAvatar)}
+          />
+          <span style={{ fontSize: '0.78rem', color: 'var(--color-slate-500)', marginTop: '8px', fontWeight: 600 }}>
+            Tap camera to upload or change WhatsApp-style DP
           </span>
         </div>
 

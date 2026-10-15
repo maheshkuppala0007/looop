@@ -75,7 +75,7 @@ export const authService = {
               role: 'admin',
               trustScore: 100,
               rating: 5.0,
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+              avatar: '',
               city: 'Guntur',
               state: 'Andhra Pradesh'
             }
@@ -98,7 +98,7 @@ export const authService = {
               role: 'admin',
               trustScore: 100,
               rating: 5.0,
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+              avatar: '',
               city: 'Guntur',
               state: 'Andhra Pradesh'
             }
@@ -121,7 +121,7 @@ export const authService = {
               role: 'admin',
               trustScore: 100,
               rating: 5.0,
-              avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+              avatar: '',
               city: 'Guntur',
               state: 'Andhra Pradesh'
             }
@@ -194,7 +194,7 @@ export const authService = {
   googleLogin: async (googleUser) => {
     const cleanEmail = (googleUser.email || '').trim().toLowerCase();
     const cleanName = (googleUser.displayName || cleanEmail.split('@')[0]).trim();
-    const cleanAvatar = googleUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80';
+    const cleanAvatar = (googleUser.photoURL && !googleUser.photoURL.includes('unsplash.com')) ? googleUser.photoURL : '';
     const userId = googleUser.uid || `usr_${Date.now()}`;
 
     const isAdmin =
@@ -336,14 +336,14 @@ export const authService = {
         } catch {}
         return {
           success: true,
-          message: 'A 6-digit verification code has been dispatched to your email via Brevo.'
+          message: 'A 6-digit verification code has been dispatched to your email.'
         };
       }
     } catch (brevoErr) {
-      console.warn('[authService.sendOtp] Direct Brevo dispatch notice:', brevoErr.message);
+      console.warn('[authService.sendOtp] Direct dispatch notice:', brevoErr.message);
     }
 
-    throw new Error('Could not send verification email. Please verify your email address and try again.');
+    throw new Error('Failed to dispatch verification code to your email. Please ensure your connection is active and try again.');
   },
 
   /**
@@ -436,7 +436,7 @@ export const authService = {
             user: finalUser
           };
         } else {
-          throw new Error('Invalid verification code. Please check your Brevo email and try again.');
+          throw new Error('Invalid verification code. Please check your email and try again.');
         }
       }
     } catch (fallbackErr) {
@@ -445,7 +445,7 @@ export const authService = {
       }
     }
 
-    throw new Error('Invalid or expired verification code. Please check your Brevo email and enter the exact 6-digit code received.');
+    throw new Error('Invalid or expired verification code. Please check your email and enter the exact 6-digit code received.');
   },
 
   /**
@@ -574,7 +574,7 @@ export const authService = {
       role: isAdmin ? 'admin' : 'customer',
       trustScore: 100,
       rating: 5.0,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+      avatar: '',
       city: 'Guntur',
       state: 'Andhra Pradesh',
       createdAt: new Date().toISOString()
@@ -643,14 +643,30 @@ export const authService = {
     const cleanPass = newPassword || '';
     const cleanOtp = (otpCode || '').trim();
 
-    // 1. Verify 6-digit OTP code first
-    await authService.verifyOtp(cleanEmail, cleanOtp);
-
-    // 2. Direct password update in Neon PostgreSQL Cloud Database
+    // 1. Authoritative Backend REST API call (updates bcrypt hash + plain_password in PostgreSQL database)
+    let apiSuccess = false;
     try {
+      const res = await api.post('/auth/reset-password', {
+        email: cleanEmail,
+        code: cleanOtp,
+        otp: cleanOtp,
+        password: cleanPass,
+        newPassword: cleanPass
+      });
+      if (res.data?.success) {
+        apiSuccess = true;
+      }
+    } catch (apiErr) {
+      console.warn('[authService.resetPasswordWithOtp] Backend notice:', apiErr.message);
+      if (apiErr.response?.data?.message) {
+        throw new Error(apiErr.response.data.message);
+      }
+    }
+
+    // 2. Direct fallback to Neon PostgreSQL if backend was unreachable
+    if (!apiSuccess) {
+      await authService.verifyOtp(cleanEmail, cleanOtp);
       await neonDb.updatePassword(cleanEmail, cleanPass);
-    } catch (pgErr) {
-      console.warn('[Neon Sync] Password update warning:', pgErr.message);
     }
 
     // 3. Update Local Storage accounts
@@ -663,13 +679,6 @@ export const authService = {
       }
     } catch (localErr) {
       console.warn('Local user password update notice:', localErr);
-    }
-
-    // 4. Update MongoDB backend if available
-    try {
-      await api.post('/auth/reset-password', { email: cleanEmail, otp: cleanOtp, newPassword: cleanPass });
-    } catch (apiErr) {
-      console.warn('[Backend Sync] Password reset API call notice:', apiErr.message);
     }
 
     return {

@@ -72,8 +72,8 @@ export const ForgotPasswordPage = () => {
       setOtpDigits(['', '', '', '', '', '']);
       setOtpCountdown(60);
       addToast({
-        title: 'Reset Code Dispatched',
-        message: `A 6-digit password recovery code has been sent to ${cleanEmail} via Brevo Email. Please check your inbox or spam folder.`,
+        title: 'Reset Code Sent',
+        message: `A 6-digit password recovery code has been sent to ${cleanEmail}. Please check your inbox or spam folder.`,
         variant: 'info'
       });
       setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
@@ -243,7 +243,7 @@ export const ForgotPasswordPage = () => {
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
             borderRadius: '24px',
-            padding: '2rem 1.5rem',
+            padding: 'clamp(1.5rem, 5vw, 2.25rem) clamp(1rem, 4vw, 1.5rem)',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
             color: '#0f172a',
             position: 'relative',
@@ -359,7 +359,7 @@ export const ForgotPasswordPage = () => {
                   style={{ width: '100%', borderRadius: '12px' }}
                   iconRight={!isSendingOtp ? Send : undefined}
                 >
-                  {isSendingOtp ? 'Sending code...' : 'Send OTP Code via Brevo'}
+                  {isSendingOtp ? 'Sending code...' : 'Send OTP Code'}
                 </Button>
               </div>
             </form>
@@ -370,7 +370,7 @@ export const ForgotPasswordPage = () => {
             <form onSubmit={handleResetPasswordSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', boxSizing: 'border-box' }}>
               <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>
                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>
-                  Enter 6-digit code sent via Brevo Email to:
+                  Enter 6-digit code sent to your email:
                 </p>
                 <div
                   style={{
@@ -390,7 +390,19 @@ export const ForgotPasswordPage = () => {
               </div>
 
               {/* 6 Digit OTP Box Inputs */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: 'clamp(3px, 1.2vw, 6px)',
+                  width: '100%',
+                  maxWidth: '100%',
+                  margin: '0 auto',
+                  boxSizing: 'border-box',
+                  padding: '0 2px'
+                }}
+              >
                 {otpDigits.map((digit, idx) => (
                   <input
                     key={idx}
@@ -405,17 +417,21 @@ export const ForgotPasswordPage = () => {
                     onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                     onPaste={handleOtpPaste}
                     style={{
-                      width: '42px',
-                      height: '50px',
+                      flex: '1 1 0',
+                      width: '100%',
+                      maxWidth: '46px',
+                      minWidth: '28px',
+                      height: 'clamp(42px, 11vw, 50px)',
                       textAlign: 'center',
-                      fontSize: '1.35rem',
+                      fontSize: 'clamp(1.1rem, 4.2vw, 1.35rem)',
                       fontWeight: 800,
                       borderRadius: '10px',
-                      border: '2px solid #cbd5e1',
+                      border: digit ? '2px solid #059669' : '2px solid #cbd5e1',
                       outline: 'none',
                       color: '#047857',
                       backgroundColor: '#ffffff',
-                      boxSizing: 'border-box'
+                      boxSizing: 'border-box',
+                      padding: 0
                     }}
                   />
                 ))}
