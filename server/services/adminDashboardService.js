@@ -60,6 +60,7 @@ const getDashboardOverview = async (range = '30d') => {
         (SELECT COUNT(*)::int FROM users WHERE created_at >= $1) AS "newUsersInPeriod",
         (SELECT COUNT(*)::int FROM items) AS "totalItems",
         (SELECT COUNT(*)::int FROM items WHERE availability = 'Available' AND status = 'active') AS "availableItems",
+        (SELECT COUNT(*)::int FROM items WHERE status IN ('pending_approval', 'pending_review', 'pending')) AS "pendingItems",
         (SELECT COUNT(*)::int FROM items WHERE created_at >= $1) AS "newItemsInPeriod",
         (SELECT COUNT(*)::int FROM wanted_items WHERE status = 'ACTIVE') AS "activeWantedItems",
         (SELECT COUNT(*)::int FROM requests WHERE status = 'PENDING') AS "pendingRequests",
@@ -67,7 +68,8 @@ const getDashboardOverview = async (range = '30d') => {
         (SELECT COUNT(*)::int FROM transactions WHERE status = 'COMPLETED') AS "completedTransactions",
         (SELECT COUNT(*)::int FROM transactions WHERE status = 'COMPLETED' AND completed_at >= $1) AS "completedInPeriod",
         (SELECT COUNT(*)::int FROM reports WHERE status IN ('PENDING', 'REVIEWED')) AS "openReports",
-        (SELECT COUNT(*)::int FROM reviews) AS "totalReviews";
+        (SELECT COUNT(*)::int FROM reviews) AS "totalReviews",
+        (SELECT COUNT(*)::int FROM reward_orders WHERE status IN ('ORDER_PLACED', 'CONFIRMED', 'PROCESSING')) AS "pendingRewardOrders";
     `;
 
     const catSql = `SELECT category, COUNT(*)::int as count FROM items WHERE status = 'active' GROUP BY category ORDER BY count DESC LIMIT 8;`;
@@ -168,6 +170,8 @@ const getDashboardOverview = async (range = '30d') => {
         activeUsers,
         totalItems,
         availableItems,
+        pendingItems: m.pendingItems ?? 0,
+        pendingRewardOrders: m.pendingRewardOrders ?? 0,
         activeWantedItems,
         pendingRequests,
         activeTransactions,

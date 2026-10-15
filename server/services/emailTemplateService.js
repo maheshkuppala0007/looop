@@ -388,7 +388,7 @@ const looopEmailTemplates = {
     })
   }),
 
-  pointsEarnedCustomer: ({ name = 'Member', pointsAmount = 100, itemTitle = 'Product', transactionType = 'Reuse', newBalance = 450, appUrl = 'https://loop-five-azure.vercel.app' }) => ({
+  pointsEarnedCustomer: ({ name = 'Member', pointsAmount = 100, itemTitle = 'Product', transactionType = 'Reuse', newBalance = 450, appUrl = 'https://looop-main.vercel.app' }) => ({
     subject: `You earned +${pointsAmount} LOOOP Points! 🎉`,
     html: buildLooopEmailHtml({
       headline: `Congratulations! You Earned +${pointsAmount} Points`,
@@ -407,6 +407,112 @@ const looopEmailTemplates = {
       extraNote: 'Thank you for participating in circular sharing and helping protect our environment!',
       signoffTeam: '— The LOOOP Team'
     })
+  }),
+
+  rewardRedemptionAdmin: ({
+    orderNumber,
+    customerName,
+    customerEmail,
+    productTitle,
+    quantity = 1,
+    totalCoins,
+    recipientName,
+    recipientPhone,
+    deliveryAddress,
+    city,
+    state,
+    postalCode,
+    appUrl = 'https://looop-main.vercel.app'
+  }) => ({
+    subject: `LOOOP Reward Redemption — Order #${orderNumber}`,
+    html: buildLooopEmailHtml({
+      headline: 'New Prize Redemption Order! 🎁',
+      recipientName: 'Admin Team',
+      bodyParagraphs: [
+        `A customer has redeemed their LOOOP coins for a Rewards Store prize.`,
+        `Please review the delivery information below, pack the item, and dispatch via courier.`
+      ],
+      cardTitle: 'REDEMPTION & DELIVERY SUMMARY',
+      cardRows: [
+        { label: 'Order Number', value: `#${orderNumber}` },
+        { label: 'Prize Item', value: productTitle },
+        { label: 'Quantity', value: String(quantity) },
+        { label: 'Coins Paid', value: `${totalCoins} Coins` },
+        { label: 'Customer Account', value: `${customerName} (${customerEmail})` },
+        { label: 'Recipient Name', value: recipientName },
+        { label: 'Contact Phone', value: recipientPhone },
+        { label: 'Delivery Address', value: deliveryAddress },
+        { label: 'City & Postal Code', value: `${city}, ${state} - ${postalCode}` }
+      ],
+      buttonText: 'View Order in Admin Portal',
+      buttonUrl: `${appUrl}/admin/reward-orders`,
+      extraNote: 'Update courier tracking details in the Admin Portal once the parcel is handed over.',
+      signoffTeam: '— LOOOP Rewards Fulfillment Service'
+    })
+  }),
+
+  rewardOrderConfirmedCustomer: ({
+    orderNumber,
+    customerName,
+    productTitle,
+    quantity = 1,
+    totalCoins,
+    recipientName,
+    addressSummary,
+    estimatedDays = 5,
+    appUrl = 'https://looop-main.vercel.app'
+  }) => ({
+    subject: `Your LOOOP Rewards Order Has Been Confirmed — Order #${orderNumber}`,
+    html: buildLooopEmailHtml({
+      headline: 'Your Prize Order is Confirmed! 🎉',
+      recipientName: customerName,
+      bodyParagraphs: [
+        `Congratulations on redeeming your circular sharing coins! We are packing your prize and getting it ready for dispatch.`
+      ],
+      cardTitle: 'ORDER SUMMARY',
+      cardRows: [
+        { label: 'Order Number', value: `#${orderNumber}` },
+        { label: 'Prize Item', value: productTitle },
+        { label: 'Quantity', value: String(quantity) },
+        { label: 'Coins Redeemed', value: `${totalCoins} LOOOP Coins` },
+        { label: 'Delivery To', value: `${recipientName} (${addressSummary})` },
+        { label: 'Estimated Delivery', value: `Within ${estimatedDays} business days` }
+      ],
+      buttonText: 'Track Order Progress',
+      buttonUrl: `${appUrl}/rewards/orders`,
+      extraNote: 'You will receive another notification with your tracking number as soon as the package ships!',
+      signoffTeam: '— The LOOOP Rewards Team'
+    })
+  }),
+
+  rewardOrderStatusUpdatedCustomer: ({
+    orderNumber,
+    customerName,
+    productTitle,
+    statusLabel,
+    courierName = '',
+    trackingNumber = '',
+    appUrl = 'https://looop-main.vercel.app'
+  }) => ({
+    subject: `Update on your LOOOP Reward Order #${orderNumber}: ${statusLabel}`,
+    html: buildLooopEmailHtml({
+      headline: `Order Status: ${statusLabel}`,
+      recipientName: customerName,
+      bodyParagraphs: [
+        `Your order #${orderNumber} for "${productTitle}" has been updated to: ${statusLabel}.`
+      ],
+      cardTitle: 'FULFILLMENT DETAILS',
+      cardRows: [
+        { label: 'Order Number', value: `#${orderNumber}` },
+        { label: 'Status', value: statusLabel },
+        ...(courierName ? [{ label: 'Courier Partner', value: courierName }] : []),
+        ...(trackingNumber ? [{ label: 'Tracking / AWB #', value: trackingNumber }] : [])
+      ],
+      buttonText: 'View Order Details',
+      buttonUrl: `${appUrl}/rewards/orders`,
+      extraNote: 'Thank you for your active participation in community reuse on LOOOP!',
+      signoffTeam: '— The LOOOP Rewards Team'
+    })
   })
 };
 
@@ -414,3 +520,4 @@ module.exports = {
   buildLooopEmailHtml,
   looopEmailTemplates
 };
+

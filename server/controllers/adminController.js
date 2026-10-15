@@ -911,10 +911,26 @@ exports.approveItem = async (req, res) => {
       const pgCheck = await pgQuery('SELECT id, title, owner_id FROM items WHERE id = $1 LIMIT 1', [id]);
       if (pgCheck?.rows?.[0]) {
         const pgItem = pgCheck.rows[0];
-        await pgQuery("UPDATE items SET status = 'active', availability = 'Available', updated_at = NOW() WHERE id = $1", [id]);
+        const adminId = req.user?.id || req.user?._id || 'admin';
+        await pgQuery("UPDATE items SET status = 'active', availability = 'Available', approved_at = NOW(), approved_by = $2, updated_at = NOW() WHERE id = $1", [id, String(adminId)]);
         clearAdminItemsCache();
         adminDashboardService.invalidateDashboardCache();
         adminAnalyticsService.invalidateAnalyticsCache();
+
+        // Customer in-app notification
+        try {
+          await pgQuery(
+            `INSERT INTO notifications (id, recipient_id, type, category, title, message, link, is_read, created_at, updated_at)
+             VALUES ($1, $2, 'ITEM_APPROVED', 'ITEMS', $3, $4, $5, false, NOW(), NOW());`,
+            [
+              `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              pgItem.owner_id,
+              'Product Listing Approved! 🎉',
+              `Your listing "${pgItem.title}" has been reviewed, approved, and is now live on the circular marketplace.`,
+              `/items/${id}`
+            ]
+          );
+        } catch {}
 
         return res.status(200).json({
           success: true,
@@ -987,10 +1003,25 @@ exports.rejectItem = async (req, res) => {
       const pgCheck = await pgQuery('SELECT id, title, owner_id FROM items WHERE id = $1 LIMIT 1', [id]);
       if (pgCheck?.rows?.[0]) {
         const pgItem = pgCheck.rows[0];
-        await pgQuery("UPDATE items SET status = 'rejected', availability = 'Unavailable', updated_at = NOW() WHERE id = $1", [id]);
+        const rejectionNote = reason || 'Item does not meet platform sharing guidelines.';
+        await pgQuery("UPDATE items SET status = 'rejected', availability = 'Unavailable', rejection_reason = $2, updated_at = NOW() WHERE id = $1", [id, rejectionNote]);
         clearAdminItemsCache();
         adminDashboardService.invalidateDashboardCache();
         adminAnalyticsService.invalidateAnalyticsCache();
+
+        // Customer in-app notification
+        try {
+          await pgQuery(
+            `INSERT INTO notifications (id, recipient_id, type, category, title, message, link, is_read, created_at, updated_at)
+             VALUES ($1, $2, 'ITEM_REJECTED', 'ITEMS', $3, $4, '/my-items', false, NOW(), NOW());`,
+            [
+              `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              pgItem.owner_id,
+              'Listing Needs Revision',
+              `Your product "${pgItem.title}" was not approved. Reason: ${rejectionNote}`
+            ]
+          );
+        } catch {}
 
         return res.status(200).json({
           success: true,
@@ -1022,7 +1053,7 @@ exports.rejectItem = async (req, res) => {
     adminAnalyticsService.invalidateAnalyticsCache();
 
     await logAction({
-      adminId: req.admin._id,
+      adminId: req.admin?._id,
       action: 'ITEM_REJECTED',
       targetType: 'ITEM',
       targetId: item._id,
@@ -1053,6 +1084,71 @@ exports.rejectItem = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to reject item.' });
   }
 };
+
+/**
+ * Award coins for a product contribution directly from admin review modal
+ * Strictly protected against duplicate rewarding.
+ */
+exports.awardItemCoins = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { coins = 50, reason = 'Product contribution approved reward' } = req.body;
+    const adminId = req.user?.id || req.user?._id || 'admin';
+
+    const coinAmount = parseInt(coins, 10);
+    if (isNaN(coinAmount) || coinAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'A valid positive coin amount is required.' });
+    }
+
+    // 1. Fetch item from PostgreSQL
+    const itemRes = await pgQuery(
+      'SELECT id, title, owner_id, status, coins_awarded FROM items WHERE id = $1 LIMIT 1;',
+      [String(id)]
+    );
+
+    if (!itemRes?.rows?.[0]) {
+      return res.status(404).json({ success: false, message: 'Item not found in catalog.' });
+    }
+
+    const item = itemRes.rows[0];
+
+    // Idempotency check: prevent duplicate awarding
+    if (item.coins_awarded && item.coins_awarded > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Coins have already been awarded for this item (${item.coins_awarded} coins). Duplicate awarding is prevented.`
+      });
+    }
+
+    // 2. Award coins through auditable coin ledger service
+    const coinLedgerService = require('../services/coinLedgerService');
+    const awardResult = await coinLedgerService.awardCoins({
+      userId: item.owner_id,
+      amount: coinAmount,
+      reason: `${reason} ("${item.title}")`,
+      referenceType: 'ITEM_CONTRIBUTION',
+      referenceId: item.id,
+      adminId,
+      idempotencyKey: `AWARD:ITEM:${item.id}`
+    });
+
+    clearAdminItemsCache();
+    adminDashboardService.invalidateDashboardCache();
+    adminAnalyticsService.invalidateAnalyticsCache();
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully awarded ${coinAmount} LOOOP Coins to the product contributor.`,
+      coinsAwarded: coinAmount,
+      newBalance: awardResult.newBalance,
+      duplicate: awardResult.duplicate || false
+    });
+  } catch (error) {
+    console.error('[awardItemCoins] Error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Failed to award coins for this product.' });
+  }
+};
+
 
 exports.getUploadRules = async (req, res) => {
   try {

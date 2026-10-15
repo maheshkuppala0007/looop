@@ -340,6 +340,8 @@ exports.createItem = async (req, res) => {
       ? specifications.map((s) => (typeof s === 'string' ? { key: 'Feature', value: s } : { key: s.key || '', value: s.value || '' }))
       : [];
 
+    const itemStatus = isAdmin ? 'active' : 'pending_approval';
+
     // 7. Save item into Neon PostgreSQL Database Backend
     let pgSavedItem = null;
     const baseParams = [
@@ -354,7 +356,7 @@ exports.createItem = async (req, res) => {
       normalizedSharingType.substring(0, 20),
       normalizedCondition.substring(0, 30),
       'Available',
-      'active',
+      itemStatus,
       (locationObj.city || '').substring(0, 100),
       (locationObj.district || '').substring(0, 100),
       (locationObj.state || '').substring(0, 100),
@@ -367,6 +369,7 @@ exports.createItem = async (req, res) => {
       borrowNotesStr.substring(0, 500),
       exchangeWantedStr.substring(0, 300)
     ];
+
 
     // First attempt: include specifications column
     let pgErrorDetails = null;
@@ -504,16 +507,58 @@ exports.createItem = async (req, res) => {
 
     // In-app notification for the customer
     try {
+      const custTitle = itemStatus === 'active' ? 'Listing Published 🎉' : 'Product Submitted for Review 📦';
+      const custMsg = itemStatus === 'active'
+        ? `"${title.trim()}" is now published and discoverable by community members on LOOOP.`
+        : `"${title.trim()}" has been submitted for moderation. You will be notified once reviewed by an admin.`;
+
       await pgQuery(
         `INSERT INTO notifications (id, recipient_id, type, category, title, message, link, is_read, created_at, updated_at)
-         VALUES ($1, $2, 'ITEM_PUBLISHED', 'items', 'Listing Published 🎉', $3, $4, false, NOW(), NOW());`,
+         VALUES ($1, $2, $3, 'items', $4, $5, $6, false, NOW(), NOW());`,
         [
           `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           resolvedOwnerId,
-          `"${title.trim()}" is now published and discoverable by community members on LOOOP.`,
-          `/items/${pgSavedItem ? pgSavedItem.id : neonItemId}`
+          itemStatus === 'active' ? 'ITEM_PUBLISHED' : 'ITEM_SUBMITTED',
+          custTitle,
+          custMsg,
+          `/my-items`
         ]
       );
+    } catch {}
+
+    // In-app notification for administrators with red badge trigger
+    try {
+      const adminUsers = await pgQuery("SELECT id FROM users WHERE LOWER(role) = 'admin' LIMIT 5;");
+      for (const adm of adminUsers.rows || []) {
+        await pgQuery(
+          `INSERT INTO notifications (id, recipient_id, actor_id, type, category, title, message, link, related_entity_type, related_entity_id, is_read, created_at, updated_at)
+           VALUES ($1, $2, $3, 'NEW_ITEM_SUBMITTED', 'ITEMS', $4, $5, '/admin/products', 'ITEM', $6, false, NOW(), NOW());`,
+          [
+            `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            adm.id,
+            resolvedOwnerId,
+            'New Product Needs Review 📦',
+            `${userName} submitted "${title.trim()}" in ${category}. Review and approve to publish.`,
+            pgSavedItem ? pgSavedItem.id : neonItemId
+          ]
+        );
+      }
+    } catch (admNotifErr) {
+      console.warn('[itemController] Admin notification notice:', admNotifErr.message);
+    }
+
+    // Socket.IO real-time broadcast to admin channel
+    try {
+      const { getIO } = require('../sockets');
+      const io = getIO();
+      if (io) {
+        io.to('admin_channel').emit('new_item_submitted', {
+          itemId: pgSavedItem ? pgSavedItem.id : neonItemId,
+          title: title.trim(),
+          category,
+          ownerName: userName
+        });
+      }
     } catch {}
 
     // 10. Record item creation event in Neon admin audit logs
@@ -526,12 +571,13 @@ exports.createItem = async (req, res) => {
           resolvedOwnerId,
           pgSavedItem ? pgSavedItem.id : neonItemId,
           title.trim(),
-          JSON.stringify({ category, sharingType, city: locationObj.city })
+          JSON.stringify({ category, sharingType, status: itemStatus, city: locationObj.city })
         ]
       );
     } catch {
       // non-critical
     }
+
 
     // 10. PostgreSQL is the authoritative store for items.
     if (!pgSavedItem) {

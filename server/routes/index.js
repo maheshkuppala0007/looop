@@ -18,6 +18,9 @@ const matchRoutes = require('./matchRoutes');
 const adminRoutes = require('./adminRoutes');
 const impactRoutes = require('./impactRoutes');
 const pointsRoutes = require('./pointsRoutes');
+const coinRoutes = require('./coinRoutes');
+const rewardRoutes = require('./rewardRoutes');
+const addressRoutes = require('./addressRoutes');
 const locationRoutes = require('./locationRoutes');
 const mapRoutes = require('./mapRoutes');
 const webhookRoutes = require('./webhookRoutes');
@@ -51,8 +54,12 @@ router.use('/notifications', notificationRoutes);
 router.use('/matches', matchRoutes);
 router.use('/impact', impactRoutes);
 router.use('/points', pointsRoutes);
+router.use('/coins', coinRoutes);
+router.use('/rewards', rewardRoutes);
+router.use('/addresses', addressRoutes);
 router.use('/location', locationRoutes);
 router.use('/maps', mapRoutes);
+
 
 // Root /api info
 router.get('/', (req, res) => {

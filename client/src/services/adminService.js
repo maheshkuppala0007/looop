@@ -621,7 +621,80 @@ export const adminService = {
 
     const res = await api.get(`/admin/audit-logs?${query.toString()}`);
     return res.data;
+  },
+
+  // 12. Product Review & Coin Awarding
+  awardItemCoins: async (itemId, data = { coins: 50, reason: 'Product contribution approved' }) => {
+    const res = await api.post(`/admin/items/${itemId}/award-coins`, data);
+    return res.data;
+  },
+
+  // 13. Rewards Store Settings & Master Switch
+  getRewardsSettings: async () => {
+    const res = await api.get('/admin/rewards/settings');
+    return res.data;
+  },
+
+  updateRewardsSettings: async (data) => {
+    const res = await api.put('/admin/rewards/settings', data);
+    return res.data;
+  },
+
+  // 14. Rewards Store Catalog Management
+  getAdminRewards: async (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', params.page);
+    if (params.limit) query.append('limit', params.limit);
+    if (params.category) query.append('category', params.category);
+    if (params.status) query.append('status', params.status);
+    if (params.search) query.append('search', params.search);
+
+    const res = await api.get(`/admin/rewards?${query.toString()}`);
+    return res.data;
+  },
+
+  createAdminReward: async (data) => {
+    const res = await api.post('/admin/rewards', data);
+    return res.data;
+  },
+
+  updateAdminReward: async (id, data) => {
+    const res = await api.put(`/admin/rewards/${id}`, data);
+    return res.data;
+  },
+
+  deleteAdminReward: async (id) => {
+    const res = await api.delete(`/admin/rewards/${id}`);
+    return res.data;
+  },
+
+  // 15. Rewards Store Orders & Delivery Fulfillment
+  getAdminRewardOrders: async (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', params.page);
+    if (params.limit) query.append('limit', params.limit);
+    if (params.status) query.append('status', params.status);
+    if (params.search) query.append('search', params.search);
+
+    const res = await api.get(`/admin/reward-orders?${query.toString()}`);
+    return res.data;
+  },
+
+  getAdminRewardOrderDetail: async (id) => {
+    const res = await api.get(`/admin/reward-orders/${id}`);
+    return res.data;
+  },
+
+  updateAdminRewardOrderStatus: async (id, data) => {
+    const res = await api.patch(`/admin/reward-orders/${id}/status`, data);
+    return res.data;
+  },
+
+  cancelAndRefundRewardOrder: async (id, reason = 'Cancelled by administrator') => {
+    const res = await api.post(`/admin/reward-orders/${id}/refund`, { reason });
+    return res.data;
   }
 };
 
 export default adminService;
+

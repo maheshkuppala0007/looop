@@ -40,6 +40,9 @@ const ProfilePage = lazy(() => import('../pages/customer/ProfilePage'));
 const ReviewsPage = lazy(() => import('../pages/customer/ReviewsPage'));
 const ImpactPage = lazy(() => import('../pages/customer/ImpactPage'));
 const PointsDashboardPage = lazy(() => import('../pages/customer/PointsDashboardPage'));
+const RewardsStorePage = lazy(() => import('../pages/customer/RewardsStorePage'));
+const CoinsWalletPage = lazy(() => import('../pages/customer/CoinsWalletPage'));
+const MyRewardOrdersPage = lazy(() => import('../pages/customer/MyRewardOrdersPage'));
 
 // 3. Lazy-loaded Admin Pages
 const AdminLoginPage = lazy(() => import('../pages/admin/AdminLoginPage'));
@@ -56,6 +59,9 @@ const AdminAnalyticsPage = lazy(() => import('../pages/admin/AdminAnalyticsPage'
 const AdminSettingsPage = lazy(() => import('../pages/admin/AdminSettingsPage'));
 const AdminAuditLogsPage = lazy(() => import('../pages/admin/AdminAuditLogsPage'));
 const AdminPointsPage = lazy(() => import('../pages/admin/AdminPointsPage'));
+const AdminRewardsPage = lazy(() => import('../pages/admin/AdminRewardsPage'));
+const AdminRewardFormPage = lazy(() => import('../pages/admin/AdminRewardFormPage'));
+const AdminRewardOrdersPage = lazy(() => import('../pages/admin/AdminRewardOrdersPage'));
 const AdminMessagesPage = lazy(() => import('../pages/admin/AdminMessagesPage'));
 const AdminNotificationsPage = lazy(() => import('../pages/admin/AdminNotificationsPage'));
 const AdminReviewsPage = lazy(() => import('../pages/admin/AdminReviewsPage'));
@@ -300,6 +306,39 @@ export const AppRoutes = () => {
         }
       />
       <Route
+        path="/rewards"
+        element={
+          <ProtectedRoute>
+            <CustomerLayout>
+              <RewardsStorePage />
+            </CustomerLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/customer/rewards" element={<Navigate to="/rewards" replace />} />
+      <Route
+        path="/rewards/orders"
+        element={
+          <ProtectedRoute>
+            <CustomerLayout>
+              <MyRewardOrdersPage />
+            </CustomerLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/customer/rewards/orders" element={<Navigate to="/rewards/orders" replace />} />
+      <Route
+        path="/coins"
+        element={
+          <ProtectedRoute>
+            <CustomerLayout>
+              <CoinsWalletPage />
+            </CustomerLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/customer/coins" element={<Navigate to="/coins" replace />} />
+      <Route
         path="/customer/messages"
         element={
           <ProtectedRoute>
@@ -473,6 +512,46 @@ export const AppRoutes = () => {
           <ProtectedRoute requiredRole="ADMIN">
             <AdminLayout>
               <AdminPointsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/rewards"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminRewardsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/rewards/new"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminRewardFormPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/rewards/:id/edit"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminRewardFormPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/reward-orders"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminRewardOrdersPage />
             </AdminLayout>
           </ProtectedRoute>
         }

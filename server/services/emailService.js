@@ -621,6 +621,80 @@ async function sendAdminTestEmail({ testRecipientEmail }) {
   });
 }
 
+async function sendRewardRedemptionAdminEmail(orderData) {
+  const adminContactEmail = process.env.BREVO_SENDER_EMAIL || process.env.ADMIN_ALERT_EMAIL || 'looop.support@gmail.com';
+  return dispatchEmail({
+    eventType: 'REWARD_REDEMPTION_ADMIN_ALERT',
+    recipientEmail: adminContactEmail,
+    recipientName: 'LOOOP Administrator',
+    templateKey: 'rewardRedemptionAdmin',
+    templateData: {
+      orderNumber: orderData.orderNumber,
+      customerName: orderData.customerName,
+      customerEmail: orderData.customerEmail,
+      productTitle: orderData.productTitle,
+      quantity: orderData.quantity || 1,
+      totalCoins: orderData.totalCoins,
+      recipientName: orderData.deliveryAddress?.recipientName || orderData.customerName,
+      recipientPhone: orderData.deliveryAddress?.phone || 'N/A',
+      deliveryAddress: `${orderData.deliveryAddress?.addressLine1 || ''} ${orderData.deliveryAddress?.addressLine2 || ''} ${orderData.deliveryAddress?.locality || ''}`.trim(),
+      city: orderData.deliveryAddress?.city || 'N/A',
+      state: orderData.deliveryAddress?.state || 'N/A',
+      postalCode: orderData.deliveryAddress?.postalCode || 'N/A',
+      appUrl: process.env.CLIENT_URL || process.env.FRONTEND_URL || 'https://looop-main.vercel.app'
+    },
+    isEssential: true,
+    category: 'system',
+    deduplicationKey: `REWARD_ADMIN_ALERT:${orderData.orderNumber}`
+  });
+}
+
+async function sendRewardOrderConfirmedCustomerEmail(orderData) {
+  if (!orderData.customerEmail) return { success: false, message: 'Missing customer email' };
+  return dispatchEmail({
+    eventType: 'REWARD_ORDER_CONFIRMED_CUSTOMER',
+    recipientEmail: orderData.customerEmail,
+    recipientName: orderData.customerName || 'Valued Member',
+    templateKey: 'rewardOrderConfirmedCustomer',
+    templateData: {
+      orderNumber: orderData.orderNumber,
+      customerName: orderData.customerName || 'Valued Member',
+      productTitle: orderData.productTitle,
+      quantity: orderData.quantity || 1,
+      totalCoins: orderData.totalCoins,
+      recipientName: orderData.deliveryAddress?.recipientName || orderData.customerName,
+      addressSummary: `${orderData.deliveryAddress?.city || ''}, ${orderData.deliveryAddress?.postalCode || ''}`.trim(),
+      estimatedDays: orderData.estimatedDeliveryDays || 5,
+      appUrl: process.env.CLIENT_URL || process.env.FRONTEND_URL || 'https://looop-main.vercel.app'
+    },
+    isEssential: true,
+    category: 'account',
+    deduplicationKey: `REWARD_CUST_CONFIRM:${orderData.orderNumber}`
+  });
+}
+
+async function sendRewardOrderStatusUpdatedEmail(orderData) {
+  if (!orderData.customerEmail) return { success: false, message: 'Missing customer email' };
+  return dispatchEmail({
+    eventType: 'REWARD_ORDER_STATUS_UPDATED',
+    recipientEmail: orderData.customerEmail,
+    recipientName: orderData.customerName || 'Valued Member',
+    templateKey: 'rewardOrderStatusUpdatedCustomer',
+    templateData: {
+      orderNumber: orderData.orderNumber,
+      customerName: orderData.customerName || 'Valued Member',
+      productTitle: orderData.productTitle,
+      statusLabel: orderData.statusLabel || orderData.status,
+      courierName: orderData.courierName || '',
+      trackingNumber: orderData.trackingNumber || '',
+      appUrl: process.env.CLIENT_URL || process.env.FRONTEND_URL || 'https://looop-main.vercel.app'
+    },
+    isEssential: true,
+    category: 'account',
+    deduplicationKey: `REWARD_STATUS_UPDATE:${orderData.orderNumber}:${orderData.status}`
+  });
+}
+
 module.exports = {
   setProvider,
   getActiveProvider,
@@ -640,5 +714,9 @@ module.exports = {
   sendTransactionCompletedEmail,
   sendWantedMatchEmail,
   sendSecurityNotificationEmail,
-  sendAdminTestEmail
+  sendAdminTestEmail,
+  sendRewardRedemptionAdminEmail,
+  sendRewardOrderConfirmedCustomerEmail,
+  sendRewardOrderStatusUpdatedEmail
 };
+

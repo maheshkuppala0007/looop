@@ -10,7 +10,11 @@ import {
   MapPin,
   CheckCircle,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Coins,
+  XCircle,
+  Award,
+  Sparkles
 } from 'lucide-react';
 import adminService from '../../services/adminService';
 import AdminTable from '../../components/admin/AdminTable';
@@ -95,6 +99,17 @@ export const AdminItemsPage = () => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [fullDetails, setFullDetails] = useState(null);
+
+  // Award Coins State
+  const [awardItem, setAwardItem] = useState(null);
+  const [awardCoins, setAwardCoins] = useState(50);
+  const [awardReason, setAwardReason] = useState('Product contribution approved');
+  const [isAwardLoading, setIsAwardLoading] = useState(false);
+
+  // Reject Item State
+  const [rejectItem, setRejectItem] = useState(null);
+  const [rejectReason, setRejectReason] = useState('Product details did not meet platform guidelines');
+  const [isRejectLoading, setIsRejectLoading] = useState(false);
 
   const fetchData = useCallback(async (silent = false) => {
     try {
@@ -249,6 +264,84 @@ export const AdminItemsPage = () => {
     }
   };
 
+  const handleAwardCoinsSubmit = async () => {
+    if (!awardItem) return;
+    try {
+      setIsAwardLoading(true);
+      const itemId = awardItem._id || awardItem.id;
+      const res = await adminService.awardItemCoins(itemId, {
+        coins: Number(awardCoins),
+        reason: awardReason
+      });
+      if (res?.success) {
+        setNotification({
+          type: 'success',
+          message: res.message || `Successfully awarded ${awardCoins} coins to ${awardItem.owner?.name || 'contributor'}!`
+        });
+        setItems(prev => prev.map(i => {
+          if ((i._id || i.id) === itemId) {
+            return { ...i, coins_awarded: Number(awardCoins), coinsAwarded: Number(awardCoins) };
+          }
+          return i;
+        }));
+        setAwardItem(null);
+        if (detailsItem && (detailsItem._id || detailsItem.id) === itemId) {
+          setDetailsItem(prev => ({ ...prev, coins_awarded: Number(awardCoins), coinsAwarded: Number(awardCoins) }));
+        }
+      } else {
+        setNotification({
+          type: 'error',
+          message: res?.message || 'Failed to award coins.'
+        });
+      }
+    } catch (err) {
+      console.error('Award coins error:', err);
+      setNotification({
+        type: 'error',
+        message: err.response?.data?.message || err.message || 'Failed to award coins.'
+      });
+    } finally {
+      setIsAwardLoading(false);
+    }
+  };
+
+  const handleRejectItemSubmit = async () => {
+    if (!rejectItem) return;
+    try {
+      setIsRejectLoading(true);
+      const itemId = rejectItem._id || rejectItem.id;
+      const res = await adminService.rejectItem(itemId, rejectReason);
+      if (res?.success) {
+        setNotification({
+          type: 'success',
+          message: res.message || 'Product listing rejected and contributor notified.'
+        });
+        setItems(prev => prev.map(i => {
+          if ((i._id || i.id) === itemId) {
+            return { ...i, status: 'rejected' };
+          }
+          return i;
+        }));
+        setRejectItem(null);
+        setIsDetailsOpen(false);
+        fetchData(true);
+      } else {
+        setNotification({
+          type: 'error',
+          message: res?.message || 'Failed to reject listing.'
+        });
+      }
+    } catch (err) {
+      console.error('Reject error:', err);
+      setNotification({
+        type: 'error',
+        message: err.response?.data?.message || err.message || 'Failed to reject listing.'
+      });
+    } finally {
+      setIsRejectLoading(false);
+    }
+  };
+
   // Item Table Columns
   const itemColumns = [
     {
@@ -340,27 +433,95 @@ export const AdminItemsPage = () => {
             <span>Details</span>
           </button>
 
-          {(item.status === 'pending moderation' || item.approvalStatus === 'PENDING') && (
-            <button
-              type="button"
-              onClick={() => handleApproveItem(item._id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '6px 12px',
-                backgroundColor: '#10b981',
-                border: 'none',
-                borderRadius: 'var(--radius-xs)',
-                color: '#022c22',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              <CheckCircle size={12} />
-              <span>Approve &amp; Publish</span>
-            </button>
+          {(item.status === 'pending moderation' || item.status === 'pending_approval' || item.approvalStatus === 'PENDING') && (
+            <>
+              <button
+                type="button"
+                onClick={() => handleApproveItem(item._id || item.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '6px 12px',
+                  backgroundColor: '#10b981',
+                  border: 'none',
+                  borderRadius: 'var(--radius-xs)',
+                  color: '#022c22',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <CheckCircle size={12} />
+                <span>Approve &amp; Publish</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRejectItem(item)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '6px 10px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: 'var(--radius-xs)',
+                  color: '#fca5a5',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                <XCircle size={12} />
+                <span>Reject</span>
+              </button>
+            </>
+          )}
+
+          {(item.status === 'active' || item.status === 'approved') && (
+            (item.coins_awarded || item.coinsAwarded) ? (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                  border: '1px solid rgba(234, 179, 8, 0.3)',
+                  color: '#facc15',
+                  fontSize: '0.75rem',
+                  fontWeight: 700
+                }}
+              >
+                <Sparkles size={11} />
+                +{item.coins_awarded || item.coinsAwarded} Coins
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setAwardItem(item);
+                  setAwardCoins(50);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '6px 10px',
+                  backgroundColor: 'rgba(234, 179, 8, 0.2)',
+                  border: '1px solid rgba(234, 179, 8, 0.4)',
+                  borderRadius: 'var(--radius-xs)',
+                  color: '#fef08a',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <Coins size={12} />
+                <span>Award Coins</span>
+              </button>
+            )
           )}
 
           {item.status === 'suspended' || item.status === 'removed' ? (
@@ -587,25 +748,75 @@ export const AdminItemsPage = () => {
               type="button"
               onClick={() => {
                 setActiveTab('items');
+                setStatusFilter('');
                 setPage(1);
               }}
               style={{
                 padding: '6px 14px',
                 border: 'none',
                 borderRadius: 'var(--radius-xs)',
-                backgroundColor: activeTab === 'items' ? 'var(--color-primary-600)' : 'transparent',
-                color: activeTab === 'items' ? '#ffffff' : '#94a3b8',
+                backgroundColor: activeTab === 'items' && !statusFilter ? 'var(--color-primary-600)' : 'transparent',
+                color: activeTab === 'items' && !statusFilter ? '#ffffff' : '#94a3b8',
                 fontSize: '0.85rem',
                 fontWeight: 600,
                 cursor: 'pointer'
               }}
             >
-              Listed Items
+              All Listed
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('items');
+                setStatusFilter('pending moderation');
+                setPage(1);
+              }}
+              style={{
+                padding: '6px 14px',
+                border: 'none',
+                borderRadius: 'var(--radius-xs)',
+                backgroundColor: activeTab === 'items' && (statusFilter === 'pending moderation' || statusFilter === 'pending_approval') ? '#ef4444' : 'transparent',
+                color: activeTab === 'items' && (statusFilter === 'pending moderation' || statusFilter === 'pending_approval') ? '#ffffff' : '#fca5a5',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <span>Pending Review</span>
+              {items.filter(i => i.status === 'pending moderation' || i.status === 'pending_approval' || i.approvalStatus === 'PENDING').length > 0 && (
+                <span style={{ backgroundColor: '#ffffff', color: '#dc2626', fontSize: '0.7rem', fontWeight: 800, padding: '1px 6px', borderRadius: '10px' }}>
+                  {items.filter(i => i.status === 'pending moderation' || i.status === 'pending_approval' || i.approvalStatus === 'PENDING').length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('items');
+                setStatusFilter('active');
+                setPage(1);
+              }}
+              style={{
+                padding: '6px 14px',
+                border: 'none',
+                borderRadius: 'var(--radius-xs)',
+                backgroundColor: activeTab === 'items' && statusFilter === 'active' ? '#10b981' : 'transparent',
+                color: activeTab === 'items' && statusFilter === 'active' ? '#ffffff' : '#94a3b8',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Active / Approved
             </button>
             <button
               type="button"
               onClick={() => {
                 setActiveTab('wanted');
+                setStatusFilter('');
                 setPage(1);
               }}
               style={{
@@ -906,32 +1117,142 @@ export const AdminItemsPage = () => {
                     ⚠️ This item is currently locked in an active handover or exchange transaction.
                   </div>
                 )}
+
+                {/* Reward / Coins Status */}
+                {(detailsItem.coins_awarded || detailsItem.coinsAwarded) ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '12px 14px',
+                      backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                      border: '1px solid rgba(234, 179, 8, 0.3)',
+                      borderRadius: 'var(--radius-sm)',
+                      color: '#facc15',
+                      fontSize: '0.85rem',
+                      fontWeight: 700
+                    }}
+                  >
+                    <Sparkles size={16} />
+                    <span>Reward Credited: +{detailsItem.coins_awarded || detailsItem.coinsAwarded} Coins transferred to contributor's account</span>
+                  </div>
+                ) : (detailsItem.status === 'active' || detailsItem.status === 'approved') ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      backgroundColor: '#0f172a',
+                      border: '1px solid #334155',
+                      borderRadius: 'var(--radius-sm)'
+                    }}
+                  >
+                    <div>
+                      <span style={{ color: '#f8fafc', fontWeight: 600, fontSize: '0.85rem', display: 'block' }}>Platform Reward</span>
+                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Award LOOOP coins to {detailsItem.owner?.name} for this contribution</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAwardItem(detailsItem);
+                        setAwardCoins(50);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        backgroundColor: '#eab308',
+                        border: 'none',
+                        borderRadius: 'var(--radius-xs)',
+                        color: '#713f12',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Coins size={14} />
+                      <span>Award Coins</span>
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )}
 
             <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  handleOpenModeration(detailsItem, 'delete_permanently');
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                  border: '1px solid rgba(239, 68, 68, 0.5)',
-                  borderRadius: 'var(--radius-sm)',
-                  color: '#f87171',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                <Trash2 size={14} />
-                <span>Delete from Database</span>
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {(detailsItem.status === 'pending moderation' || detailsItem.status === 'pending_approval' || detailsItem.approvalStatus === 'PENDING') && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await handleApproveItem(detailsItem._id || detailsItem.id);
+                        setIsDetailsOpen(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 16px',
+                        backgroundColor: '#10b981',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        color: '#022c22',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <CheckCircle size={14} />
+                      <span>Approve &amp; Publish</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRejectItem(detailsItem)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 14px',
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        borderRadius: 'var(--radius-sm)',
+                        color: '#f87171',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <XCircle size={14} />
+                      <span>Reject</span>
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOpenModeration(detailsItem, 'delete_permanently');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                    border: '1px solid rgba(239, 68, 68, 0.5)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: '#f87171',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Trash2 size={14} />
+                  <span>Delete from DB</span>
+                </button>
+              </div>
 
               <button
                 type="button"
@@ -948,6 +1269,313 @@ export const AdminItemsPage = () => {
                 }}
               >
                 Close Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Award Coins Modal */}
+      {awardItem && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 'var(--radius-lg)',
+              width: '100%',
+              maxWidth: '520px',
+              padding: '24px',
+              boxShadow: 'var(--shadow-xl)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(234, 179, 8, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#facc15'
+                }}
+              >
+                <Coins size={22} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
+                  Award Contribution Coins
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                  Reward contributor for sharing a high-quality product
+                </span>
+              </div>
+            </div>
+
+            {/* Contributor & Product Summary */}
+            <div style={{ backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', padding: '14px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Contributor</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc' }}>
+                  {awardItem.owner?.name || 'Contributor'} ({awardItem.owner?.email || ''})
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Product</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#38bdf8' }}>
+                  {awardItem.title}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Condition / Sharing</span>
+                <span style={{ fontSize: '0.8rem', color: '#cbd5e1', textTransform: 'capitalize' }}>
+                  {awardItem.condition?.replace(/_/g, ' ') || 'Good'} • {awardItem.sharingType?.replace(/_/g, ' ') || 'Sharing'}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Coin Select */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '8px' }}>
+                Select Coin Amount
+              </label>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                {[25, 50, 100, 200].map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setAwardCoins(amt)}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      backgroundColor: awardCoins === amt ? 'rgba(234, 179, 8, 0.25)' : '#0f172a',
+                      border: `1px solid ${awardCoins === amt ? '#eab308' : '#334155'}`,
+                      borderRadius: 'var(--radius-xs)',
+                      color: awardCoins === amt ? '#facc15' : '#94a3b8',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    +{amt} Coins
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                min="1"
+                max="10000"
+                value={awardCoins}
+                onChange={(e) => setAwardCoins(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #334155',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#f8fafc',
+                  fontSize: '0.9rem',
+                  fontWeight: 600
+                }}
+              />
+            </div>
+
+            {/* Admin Note / Reason */}
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '6px' }}>
+                Reward Policy / Note
+              </label>
+              <input
+                type="text"
+                value={awardReason}
+                onChange={(e) => setAwardReason(e.target.value)}
+                placeholder="e.g. Quality product contribution approved"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #334155',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#f8fafc',
+                  fontSize: '0.85rem'
+                }}
+              />
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setAwardItem(null)}
+                disabled={isAwardLoading}
+                style={{
+                  padding: '9px 16px',
+                  backgroundColor: '#334155',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#f8fafc',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: isAwardLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAwardCoinsSubmit}
+                disabled={isAwardLoading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 20px',
+                  backgroundColor: '#eab308',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#713f12',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  cursor: isAwardLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isAwardLoading ? <Spinner size="xs" /> : <Coins size={16} />}
+                <span>Confirm &amp; Award {awardCoins} Coins</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Listing Modal */}
+      {rejectItem && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 'var(--radius-lg)',
+              width: '100%',
+              maxWidth: '480px',
+              padding: '24px',
+              boxShadow: 'var(--shadow-xl)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#f87171'
+                }}
+              >
+                <XCircle size={22} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
+                  Reject Product Listing
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                  Provide feedback to the contributor explaining the rejection
+                </span>
+              </div>
+            </div>
+
+            <p style={{ color: '#cbd5e1', fontSize: '0.875rem', marginBottom: '14px' }}>
+              Are you sure you want to reject <strong style={{ color: '#f8fafc' }}>"{rejectItem.title}"</strong>?
+            </p>
+
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '6px' }}>
+                Rejection Reason (Sent to Contributor)
+              </label>
+              <textarea
+                rows={3}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g. Inappropriate item, poor photo quality, or incomplete description..."
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #334155',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#f8fafc',
+                  fontSize: '0.85rem',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setRejectItem(null)}
+                disabled={isRejectLoading}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#334155',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#f8fafc',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: isRejectLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRejectItemSubmit}
+                disabled={isRejectLoading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 18px',
+                  backgroundColor: '#ef4444',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#ffffff',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: isRejectLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isRejectLoading ? <Spinner size="xs" /> : <XCircle size={14} />}
+                <span>Confirm Rejection</span>
               </button>
             </div>
           </div>

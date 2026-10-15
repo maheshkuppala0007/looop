@@ -548,5 +548,113 @@ CREATE TABLE IF NOT EXISTS broadcast_updates (
   sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_broadcast_sent_at ON broadcast_updates(sent_at DESC);
+-- ----------------------------------------------------------------------------
+-- 24. REWARDS STORE PRODUCTS TABLE
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS reward_products (
+  id VARCHAR(64) PRIMARY KEY,
+  title VARCHAR(200) NOT NULL,
+  slug VARCHAR(200),
+  short_description VARCHAR(500) DEFAULT '',
+  description TEXT DEFAULT '',
+  category VARCHAR(80) DEFAULT 'Home & Kitchen',
+  brand VARCHAR(100) DEFAULT '',
+  specifications JSONB DEFAULT '[]'::jsonb,
+  images JSONB DEFAULT '[]'::jsonb,
+  coin_price INT NOT NULL CHECK (coin_price > 0),
+  stock_quantity INT NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
+  reserved_quantity INT DEFAULT 0 CHECK (reserved_quantity >= 0),
+  is_published BOOLEAN DEFAULT TRUE,
+  is_active BOOLEAN DEFAULT TRUE,
+  featured BOOLEAN DEFAULT FALSE,
+  delivery_eligible BOOLEAN DEFAULT TRUE,
+  estimated_delivery_days INT DEFAULT 5,
+  condition VARCHAR(40) DEFAULT 'brand_new',
+  sku VARCHAR(80) DEFAULT '',
+  created_by_admin_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+  updated_by_admin_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
+CREATE INDEX IF NOT EXISTS idx_reward_prod_pub ON reward_products(is_published, is_active, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reward_prod_cat ON reward_products(category, is_published);
+
+-- ----------------------------------------------------------------------------
+-- 25. CUSTOMER DELIVERY ADDRESSES TABLE
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS customer_addresses (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipient_name VARCHAR(150) NOT NULL,
+  phone VARCHAR(30) NOT NULL,
+  address_line1 TEXT NOT NULL,
+  address_line2 TEXT DEFAULT '',
+  locality VARCHAR(120) DEFAULT '',
+  city VARCHAR(100) NOT NULL,
+  state VARCHAR(100) NOT NULL,
+  postal_code VARCHAR(20) NOT NULL,
+  country VARCHAR(60) DEFAULT 'India',
+  delivery_instructions TEXT DEFAULT '',
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_cust_addr_user ON customer_addresses(user_id, created_at DESC);
+
+-- ----------------------------------------------------------------------------
+-- 26. REWARD REDEMPTION ORDERS TABLE
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS reward_orders (
+  id VARCHAR(64) PRIMARY KEY,
+  order_number VARCHAR(64) NOT NULL UNIQUE,
+  customer_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reward_product_id VARCHAR(64) REFERENCES reward_products(id) ON DELETE SET NULL,
+  product_title VARCHAR(200) NOT NULL,
+  product_image TEXT DEFAULT '',
+  quantity INT NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  coin_price_per_unit INT NOT NULL CHECK (coin_price_per_unit > 0),
+  total_coins INT NOT NULL CHECK (total_coins > 0),
+  delivery_address JSONB NOT NULL,
+  delivery_method VARCHAR(60) DEFAULT 'Standard Courier Delivery',
+  status VARCHAR(40) DEFAULT 'ORDER_PLACED',
+  payment_status VARCHAR(40) DEFAULT 'PAID_IN_COINS',
+  admin_notes TEXT DEFAULT '',
+  courier_name VARCHAR(100) DEFAULT '',
+  tracking_number VARCHAR(100) DEFAULT '',
+  cancellation_reason TEXT DEFAULT '',
+  placed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  confirmed_at TIMESTAMP WITH TIME ZONE,
+  packed_at TIMESTAMP WITH TIME ZONE,
+  shipped_at TIMESTAMP WITH TIME ZONE,
+  delivered_at TIMESTAMP WITH TIME ZONE,
+  cancelled_at TIMESTAMP WITH TIME ZONE,
+  refunded_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_reward_orders_cust ON reward_orders(customer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reward_orders_status ON reward_orders(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reward_orders_num ON reward_orders(order_number);
+
+-- ----------------------------------------------------------------------------
+-- 27. SCHEMA COMPATIBILITY ENHANCEMENTS
+-- ----------------------------------------------------------------------------
+ALTER TABLE users ADD COLUMN IF NOT EXISTS coins INT DEFAULT 0;
+UPDATE users SET coins = points WHERE (coins IS NULL OR coins = 0) AND points > 0;
+
+ALTER TABLE items ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS approved_by VARCHAR(64);
+ALTER TABLE items ADD COLUMN IF NOT EXISTS rejection_reason TEXT DEFAULT '';
+ALTER TABLE items ADD COLUMN IF NOT EXISTS coins_awarded INT DEFAULT 0;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS coins_awarded_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE points_ledger ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(120);
+ALTER TABLE points_ledger ADD COLUMN IF NOT EXISTS reference_type VARCHAR(60);
+ALTER TABLE points_ledger ADD COLUMN IF NOT EXISTS reference_id VARCHAR(64);
+ALTER TABLE points_ledger ADD COLUMN IF NOT EXISTS created_by_admin_id VARCHAR(64);
+
+CREATE INDEX IF NOT EXISTS idx_items_status_moderation ON items(status, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_points_ledger_idempotency ON points_ledger(idempotency_key) WHERE idempotency_key IS NOT NULL;

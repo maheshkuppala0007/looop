@@ -18,7 +18,10 @@ import {
   X,
   PackageCheck,
   ArrowRight,
-  Leaf
+  Leaf,
+  Coins,
+  Gift,
+  Package
 } from 'lucide-react';
 import LooopLogo from '../components/common/LooopLogo';
 import Avatar from '../components/common/Avatar';
@@ -78,6 +81,7 @@ export const CustomerLayout = ({ children }) => {
       group: 'Discover & Share',
       items: [
         { label: 'Browse Items', path: '/browse', icon: Search },
+        { label: 'Rewards Store', path: '/rewards', icon: Gift },
         { label: 'Wanted Items', path: '/wanted', icon: HelpCircle },
         { label: 'Share an Item', path: '/share', icon: PlusCircle, isCta: true }
       ]
@@ -89,7 +93,8 @@ export const CustomerLayout = ({ children }) => {
         { label: 'Offers', path: '/requests?tab=offers', icon: Sparkles },
         { label: 'My Items', path: '/my-items', icon: PackageCheck },
         { label: 'Saved Items', path: '/saved', icon: Bookmark },
-        { label: 'Transactions', path: '/transactions', icon: Repeat }
+        { label: 'Transactions', path: '/transactions', icon: Repeat },
+        { label: 'Reward Orders', path: '/rewards/orders', icon: Package }
       ]
     },
     {
@@ -103,10 +108,12 @@ export const CustomerLayout = ({ children }) => {
     {
       group: 'Account',
       items: [
+        { label: 'Coins Wallet', path: '/coins', icon: Coins },
         { label: 'My Profile', path: '/profile', icon: User }
       ]
     }
   ];
+
 
   const isActive = (path) => {
     if (path === '/dashboard') {

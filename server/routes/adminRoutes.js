@@ -27,7 +27,10 @@ router.get('/items/:id', adminController.getItemDetails);
 router.delete('/items/:id', adminController.deleteItem);
 router.patch('/items/:id/moderation', adminController.moderateItem);
 router.patch('/items/:id/approve', adminController.approveItem);
+router.post('/items/:id/approve', adminController.approveItem);
 router.patch('/items/:id/reject', adminController.rejectItem);
+router.post('/items/:id/reject', adminController.rejectItem);
+router.post('/items/:id/award-coins', adminController.awardItemCoins);
 
 // 5. Wanted Items Oversight
 router.get('/wanted', adminController.getWantedItems);
@@ -94,6 +97,21 @@ router.delete('/site-reviews/:id', contentController.deleteReview);
 router.get('/broadcasts', contentController.getBroadcasts);
 router.post('/broadcasts', contentController.sendBroadcast);
 router.get('/subscribers', contentController.getSubscribers);
+
+// 17. Rewards Store Management & Master Switch
+const rewardStoreController = require('../controllers/rewardStoreController');
+router.get('/rewards/settings', rewardStoreController.getStoreSettings);
+router.put('/rewards/settings', rewardStoreController.updateStoreSettings);
+router.get('/rewards', rewardStoreController.adminGetRewards);
+router.post('/rewards', rewardStoreController.adminCreateReward);
+router.put('/rewards/:id', rewardStoreController.adminUpdateReward);
+router.delete('/rewards/:id', rewardStoreController.adminDeleteReward);
+
+// 18. Rewards Store Orders & Delivery Fulfillment
+router.get('/reward-orders', rewardStoreController.adminGetOrders);
+router.get('/reward-orders/:id', rewardStoreController.adminGetOrderDetail);
+router.patch('/reward-orders/:id/status', rewardStoreController.adminUpdateOrderStatus);
+router.post('/reward-orders/:id/refund', rewardStoreController.adminCancelAndRefundOrder);
 
 module.exports = router;
 

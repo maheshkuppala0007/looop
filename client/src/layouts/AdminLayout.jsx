@@ -25,7 +25,9 @@ import {
   Gift,
   Clock,
   Star,
-  Send
+  Send,
+  ShoppingBag,
+  PackageCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/common/Avatar';
@@ -37,7 +39,13 @@ export const AdminLayout = ({ children }) => {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
-  const [badgeCounts, setBadgeCounts] = useState({ openReports: 0, pendingRequests: 0, pointsSystem: 'ACTIVE' });
+  const [badgeCounts, setBadgeCounts] = useState({
+    pendingItems: 0,
+    pendingRewardOrders: 0,
+    openReports: 0,
+    pendingRequests: 0,
+    pointsSystem: 'ACTIVE'
+  });
   const [dbStatus, setDbStatus] = useState('Connected');
 
   // Verify database connectivity and load badge counts without slowing down page navigation
@@ -49,6 +57,8 @@ export const AdminLayout = ({ children }) => {
         const res = await adminService.getDashboard('30d');
         if (mounted && res?.success && res.data?.metrics) {
           setBadgeCounts({
+            pendingItems: res.data.metrics.pendingItems || 0,
+            pendingRewardOrders: res.data.metrics.pendingRewardOrders || 0,
             openReports: res.data.metrics.openReports || 0,
             pendingRequests: res.data.metrics.pendingRequests || 0,
             pointsSystem: 'ACTIVE'
@@ -71,7 +81,7 @@ export const AdminLayout = ({ children }) => {
     };
 
     checkStatus();
-    const interval = setInterval(checkStatus, 45000);
+    const interval = setInterval(checkStatus, 30000);
     return () => {
       mounted = false;
       clearInterval(interval);
@@ -80,7 +90,9 @@ export const AdminLayout = ({ children }) => {
 
   const navItems = [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-    { label: 'Products & Items', path: '/admin/products', icon: Package },
+    { label: 'Products & Items', path: '/admin/products', icon: Package, count: badgeCounts.pendingItems > 0 ? badgeCounts.pendingItems : undefined, alert: true },
+    { label: 'Rewards Store (Prizes)', path: '/admin/rewards', icon: Gift },
+    { label: 'Reward Orders', path: '/admin/reward-orders', icon: PackageCheck, count: badgeCounts.pendingRewardOrders > 0 ? badgeCounts.pendingRewardOrders : undefined, alert: true },
     { label: 'Users Governance', path: '/admin/users', icon: Users },
     { label: 'Reuse Requests', path: '/admin/reuse-requests', icon: Gift },
     { label: 'Borrow Requests', path: '/admin/borrow-requests', icon: Clock },
@@ -97,6 +109,7 @@ export const AdminLayout = ({ children }) => {
     { label: 'Platform Settings', path: '/admin/settings', icon: Settings },
     { label: 'Security Audit Logs', path: '/admin/audit-logs', icon: Shield }
   ];
+
 
   const isActive = (path) => {
     if (path === '/admin/dashboard') return location.pathname === '/admin/dashboard' || location.pathname === '/admin';
