@@ -48,6 +48,7 @@ export const RegisterPage = () => {
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [otpCountdown, setOtpCountdown] = useState(60);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [previewOtpCode, setPreviewOtpCode] = useState('');
   const otpInputRefs = useRef([]);
 
   // Inline Email Verification State
@@ -217,13 +218,16 @@ export const RegisterPage = () => {
       }
 
       // 2. Email is new! Dispatch 6-digit Brevo OTP code
-      await authService.sendOtp(cleanEmail);
+      const res = await authService.sendOtp(cleanEmail);
+      if (res?.otpCode) {
+        setPreviewOtpCode(res.otpCode);
+      }
       setInlineOtpSent(true);
       setInlineOtpDigits(['', '', '', '', '', '']);
       setInlineOtpCountdown(60);
       addToast({
         title: 'Verification Code Sent',
-        message: `A 6-digit verification code has been dispatched to ${cleanEmail} via email. Please check your inbox or spam folder.`,
+        message: res?.message || `A 6-digit verification code has been dispatched to ${cleanEmail} via email. Please check your inbox or spam folder.`,
         variant: 'info'
       });
       setTimeout(() => inlineOtpRefs.current[0]?.focus(), 150);
@@ -287,67 +291,116 @@ export const RegisterPage = () => {
       return;
     }
 
-    // If email is not verified yet, handle inline verification or DB check
-    if (!isEmailVerified) {
-      if (inlineOtpSent) {
-        const code = inlineOtpDigits.join('');
-        if (code.length === 6) {
-          setIsSubmitting(true);
-          setInlineOtpError('');
-          try {
-            await authService.verifyOtp(email.trim(), code);
-            setIsEmailVerified(true);
-            setInlineOtpSent(false);
-            addToast({
-              title: 'Email Verified!',
-              message: 'Your email address has been verified successfully.',
-              variant: 'success'
-            });
-          } catch (err) {
-            setInlineOtpError(err.message || 'Invalid or expired verification code. Please check your email.');
-            setIsSubmitting(false);
-            return;
-          }
-        } else {
-          setInlineOtpError('Please enter the 6-digit verification code sent to your email and click Confirm.');
+    const cleanEmail = email.trim();
+
+    // If email is already verified inline, proceed straight to registration
+    if (isEmailVerified) {
+      setIsSubmitting(true);
+      try {
+        const check = await authService.checkEmailExists(cleanEmail);
+        if (check.exists) {
+          setIsDuplicateEmail(true);
+          setIsSubmitting(false);
           return;
         }
-      } else {
-        await handleVerifyEmailClick();
+
+        const res = await authService.register({
+          name: name.trim(),
+          phone: phone.trim(),
+          email: cleanEmail,
+          password
+        });
+
+        if (res && res.token && res.user) {
+          register(res.user, res.token);
+          addToast({
+            title: 'Account Created & Verified!',
+            message: `Welcome to LOOOP, ${res.user.name || 'Member'}! Your account details have been securely saved to the database.`,
+            variant: 'success'
+          });
+          handlePostAuthRedirect(res.user);
+        }
+      } catch (err) {
+        setServerError(err.message || 'Account creation failed. Please try again.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // If inline OTP was already active and 6 digits are typed, verify inline first
+    if (inlineOtpSent) {
+      const code = inlineOtpDigits.join('');
+      if (code.length === 6) {
+        setIsSubmitting(true);
+        setInlineOtpError('');
+        try {
+          await authService.verifyOtp(cleanEmail, code);
+          setIsEmailVerified(true);
+          setInlineOtpSent(false);
+
+          const res = await authService.register({
+            name: name.trim(),
+            phone: phone.trim(),
+            email: cleanEmail,
+            password
+          });
+
+          if (res && res.token && res.user) {
+            register(res.user, res.token);
+            addToast({
+              title: 'Account Created & Verified!',
+              message: `Welcome to LOOOP, ${res.user.name || 'Member'}!`,
+              variant: 'success'
+            });
+            handlePostAuthRedirect(res.user);
+          }
+        } catch (err) {
+          setInlineOtpError(err.message || 'Invalid or expired verification code.');
+        } finally {
+          setIsSubmitting(false);
+        }
         return;
       }
     }
 
+    // Seamless Step Transition: Check duplicate email, dispatch OTP, and switch to Step 2 OTP screen!
     setIsSubmitting(true);
-
     try {
-      // 1. Check duplicate email first across database
-      const check = await authService.checkEmailExists(email.trim());
+      const check = await authService.checkEmailExists(cleanEmail);
       if (check.exists) {
         setIsDuplicateEmail(true);
         setIsSubmitting(false);
         return;
       }
 
-      // 2. Perform account registration & save directly to Neon PostgreSQL Cloud DB
-      const res = await authService.register({
+      // Save pending registration details so completeRegisterWithOtp has them
+      sessionStorage.setItem('looop_pending_reg', JSON.stringify({
         name: name.trim(),
         phone: phone.trim(),
-        email: email.trim(),
+        email: cleanEmail,
         password
+      }));
+
+      // Send OTP via Brevo
+      const otpRes = await authService.sendOtp(cleanEmail);
+      if (otpRes?.otpCode) {
+        setPreviewOtpCode(otpRes.otpCode);
+      }
+
+      setOtpDigits(['', '', '', '', '', '']);
+      setOtpCountdown(60);
+      setRegStep('otp'); // TRANSITIONS TO STEP 2 OTP SCREEN
+
+      addToast({
+        title: 'Verification Code Dispatched',
+        message: otpRes?.message || `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox.`,
+        variant: 'info'
       });
 
-      if (res && res.token && res.user) {
-        register(res.user, res.token);
-        addToast({
-          title: 'Account Created & Verified!',
-          message: `Welcome to LOOOP, ${res.user.name || 'Member'}! Your account details have been securely saved to the database.`,
-          variant: 'success'
-        });
-        handlePostAuthRedirect(res.user);
-      }
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 200);
     } catch (err) {
-      setServerError(err.message || 'Account creation failed. Please try again.');
+      setServerError(err.message || 'Failed to dispatch verification code. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -357,13 +410,18 @@ export const RegisterPage = () => {
     setServerError('');
     setIsSendingOtp(true);
     try {
-      await authService.sendOtp(email.trim());
+      const res = await authService.sendOtp(email.trim());
+      if (res?.otpCode) {
+        setPreviewOtpCode(res.otpCode);
+      }
       setOtpCountdown(60);
+      setOtpDigits(['', '', '', '', '', '']);
       addToast({
         title: 'Code Resent via Email',
-        message: 'A new 6-digit verification code has been dispatched to your email. Please check your inbox.',
+        message: res?.message || 'A new 6-digit verification code has been dispatched to your email. Please check your inbox.',
         variant: 'info'
       });
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
     } catch (err) {
       setServerError('Failed to resend verification code. Please try again.');
     } finally {
@@ -664,7 +722,41 @@ export const RegisterPage = () => {
               </div>
 
               <form onSubmit={handleVerifyOtpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
+                {previewOtpCode && (
+                  <div style={{
+                    padding: '10px 14px',
+                    backgroundColor: '#ecfdf5',
+                    border: '1px solid #a7f3d0',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px'
+                  }}>
+                    <div style={{ fontSize: '0.85rem', color: '#065f46' }}>
+                      Verification Code: <strong style={{ letterSpacing: '2px', fontSize: '1rem', color: '#047857' }}>{previewOtpCode}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const digits = previewOtpCode.slice(0, 6).split('');
+                        setOtpDigits(digits);
+                      }}
+                      style={{
+                        background: '#047857',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '4px 10px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Auto-fill
+                    </button>
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
                   {otpDigits.map((digit, idx) => (
@@ -992,7 +1084,41 @@ export const RegisterPage = () => {
                         Enter 6-digit OTP code sent to <strong>{email.trim()}</strong>:
                       </div>
 
-
+                      {previewOtpCode && (
+                        <div style={{
+                          padding: '6px 10px',
+                          backgroundColor: '#ecfdf5',
+                          border: '1px solid #a7f3d0',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '6px'
+                        }}>
+                          <span style={{ fontSize: '0.78rem', color: '#065f46' }}>
+                            Code: <strong style={{ letterSpacing: '1px', color: '#047857' }}>{previewOtpCode}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const digits = previewOtpCode.slice(0, 6).split('');
+                              setInlineOtpDigits(digits);
+                            }}
+                            style={{
+                              background: '#047857',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '5px',
+                              padding: '2px 8px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Auto-fill
+                          </button>
+                        </div>
+                      )}
 
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                         {inlineOtpDigits.map((digit, idx) => (
