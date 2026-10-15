@@ -262,11 +262,12 @@ export const authService = {
         };
       }
       if (data && data.message) {
-        throw new Error(data.message);
+        console.warn('[authService.sendOtp] Primary API message:', data.message);
       }
     } catch (err) {
       console.warn('[authService.sendOtp] Primary API attempt failed:', err.message);
-      if (err.response?.data?.message) {
+      // Only throw if 400 bad request (e.g. invalid format)
+      if (err.response?.status === 400 && err.response?.data?.message) {
         throw new Error(err.response.data.message);
       }
     }
@@ -290,11 +291,11 @@ export const authService = {
       // continue to Brevo direct dispatch fallback
     }
 
-    // 3. Direct Brevo REST API fallback (dispatches real email to inbox)
+    // 3. Direct Brevo REST API fallback (dispatches real email to inbox if configured)
     try {
       const brevoKey = (import.meta.env?.VITE_BREVO_API_KEY || '').trim();
       if (!brevoKey) {
-        throw new Error('VITE_BREVO_API_KEY not configured for direct client dispatch.');
+        throw new Error('VITE_BREVO_API_KEY not configured.');
       }
       const generatedCode = String(Math.floor(100000 + Math.random() * 900000));
       const emailHtml = buildLooopEmailHtml({

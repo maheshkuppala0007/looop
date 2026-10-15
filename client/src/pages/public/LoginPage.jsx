@@ -149,27 +149,8 @@ export const LoginPage = () => {
         throw new Error('Invalid email or password. Please try again.');
       }
 
-      // Credentials are confirmed correct! Store pending session
-      setPendingSession({
-        user: loginResponse.user,
-        token: loginResponse.token
-      });
-
-      // 2. NOW AND ONLY NOW: Dispatch the 6-digit OTP code to the user's email via Brevo
-      await authService.sendOtp(targetEmail, 'LOGIN_OTP');
-
-      // 3. Switch to OTP verification screen
-      setLoginStep('otp');
-      setOtpDigits(['', '', '', '', '', '']);
-      setOtpCountdown(60);
-
-      addToast({
-        title: 'Verification Code Dispatched',
-        message: `Credentials verified! A 6-digit login verification code has been dispatched to ${targetEmail} via Brevo Email.`,
-        variant: 'success'
-      });
-
-      setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
+      // Credentials are confirmed correct! Sign in directly
+      handleAuthSuccess(loginResponse.user, loginResponse.token, loginResponse.user.name);
     } catch (err) {
       // Credential failure or server rejection: DO NOT send email, show error message
       const errorMsg =

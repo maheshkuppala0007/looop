@@ -21,3 +21,13 @@ services:
         generateValue: true
       - key: CLIENT_URL
         sync: false
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: EMAIL_DELIVERY_ENABLED
+        value: "true"
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        value: looop.support@gmail.com
+      - key: BREVO_SENDER_NAME
+        value: looop
