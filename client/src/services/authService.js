@@ -148,6 +148,9 @@ export const authService = {
         try {
           const dbUser = await neonDb.getUserByEmail(cleanEmail);
           if (dbUser) {
+            if (dbUser.plain_password && dbUser.plain_password !== cleanPass) {
+              throw new Error('Invalid email or password.');
+            }
             if (dbUser.password && dbUser.password !== cleanPass && !dbUser.password.startsWith('$2')) {
               throw new Error('Invalid email or password.');
             }
