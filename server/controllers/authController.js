@@ -637,19 +637,16 @@ exports.sendOtp = async (req, res) => {
     });
 
     if (!emailRes.success) {
-      console.warn(`[AUTH sendOtp] Email dispatch notice (${emailRes.statusState || 'UNAVAILABLE'}):`, emailRes.errorMessage);
-      return res.status(200).json({
-        success: true,
-        delivered: false,
-        statusState: emailRes.statusState || 'SANDBOX_MODE',
-        otpCode: otpRes.rawOtp,
-        message: `Verification code generated: ${otpRes.rawOtp}. (Email delivery is in sandbox mode).`
+      console.error(`[AUTH sendOtp] Email dispatch failed (${emailRes.statusState || 'ERROR'}):`, emailRes.errorMessage);
+      return res.status(502).json({
+        success: false,
+        statusState: emailRes.statusState || 'DELIVERY_FAILED',
+        message: 'Could not deliver verification code to your email. Please check your email address and try again.'
       });
     }
 
     return res.status(200).json({
       success: true,
-      delivered: true,
       message: 'A 6-digit verification code has been sent to your email.'
     });
   } catch (error) {

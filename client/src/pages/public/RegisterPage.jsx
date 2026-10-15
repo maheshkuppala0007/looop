@@ -48,7 +48,6 @@ export const RegisterPage = () => {
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [otpCountdown, setOtpCountdown] = useState(60);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [previewOtpCode, setPreviewOtpCode] = useState('');
   const otpInputRefs = useRef([]);
 
   // Inline Email Verification State
@@ -219,9 +218,6 @@ export const RegisterPage = () => {
 
       // 2. Email is new! Dispatch 6-digit Brevo OTP code
       const res = await authService.sendOtp(cleanEmail);
-      if (res?.otpCode) {
-        setPreviewOtpCode(res.otpCode);
-      }
       setInlineOtpSent(true);
       setInlineOtpDigits(['', '', '', '', '', '']);
       setInlineOtpCountdown(60);
@@ -384,9 +380,6 @@ export const RegisterPage = () => {
 
       // Send OTP via Brevo
       const otpRes = await authService.sendOtp(cleanEmail);
-      if (otpRes?.otpCode) {
-        setPreviewOtpCode(otpRes.otpCode);
-      }
 
       setOtpDigits(['', '', '', '', '', '']);
       setOtpCountdown(60);
@@ -411,9 +404,6 @@ export const RegisterPage = () => {
     setIsSendingOtp(true);
     try {
       const res = await authService.sendOtp(email.trim());
-      if (res?.otpCode) {
-        setPreviewOtpCode(res.otpCode);
-      }
       setOtpCountdown(60);
       setOtpDigits(['', '', '', '', '', '']);
       addToast({
@@ -722,42 +712,6 @@ export const RegisterPage = () => {
               </div>
 
               <form onSubmit={handleVerifyOtpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                {previewOtpCode && (
-                  <div style={{
-                    padding: '10px 14px',
-                    backgroundColor: '#ecfdf5',
-                    border: '1px solid #a7f3d0',
-                    borderRadius: '10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '8px'
-                  }}>
-                    <div style={{ fontSize: '0.85rem', color: '#065f46' }}>
-                      Verification Code: <strong style={{ letterSpacing: '2px', fontSize: '1rem', color: '#047857' }}>{previewOtpCode}</strong>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const digits = previewOtpCode.slice(0, 6).split('');
-                        setOtpDigits(digits);
-                      }}
-                      style={{
-                        background: '#047857',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        padding: '4px 10px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Auto-fill
-                    </button>
-                  </div>
-                )}
-
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
                   {otpDigits.map((digit, idx) => (
                     <input
@@ -1083,42 +1037,6 @@ export const RegisterPage = () => {
                       <div style={{ fontSize: '0.8rem', color: '#334155', fontWeight: 600 }}>
                         Enter 6-digit OTP code sent to <strong>{email.trim()}</strong>:
                       </div>
-
-                      {previewOtpCode && (
-                        <div style={{
-                          padding: '6px 10px',
-                          backgroundColor: '#ecfdf5',
-                          border: '1px solid #a7f3d0',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '6px'
-                        }}>
-                          <span style={{ fontSize: '0.78rem', color: '#065f46' }}>
-                            Code: <strong style={{ letterSpacing: '1px', color: '#047857' }}>{previewOtpCode}</strong>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const digits = previewOtpCode.slice(0, 6).split('');
-                              setInlineOtpDigits(digits);
-                            }}
-                            style={{
-                              background: '#047857',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '5px',
-                              padding: '2px 8px',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Auto-fill
-                          </button>
-                        </div>
-                      )}
 
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                         {inlineOtpDigits.map((digit, idx) => (

@@ -256,18 +256,19 @@ export const authService = {
       const response = await api.post('/auth/otp/send', { email: cleanEmail, purpose });
       const data = response?.data || response;
       if (data && data.success) {
-        if (data.otpCode) {
-          sessionStorage.setItem(`looop_preview_otp_${cleanEmail}`, data.otpCode);
-        }
         return {
           success: true,
-          delivered: data.delivered !== false,
-          otpCode: data.otpCode,
           message: data.message || 'A 6-digit verification code has been sent to your email.'
         };
       }
+      if (data && data.message) {
+        throw new Error(data.message);
+      }
     } catch (err) {
       console.warn('[authService.sendOtp] Primary API attempt failed:', err.message);
+      if (err.response?.data?.message) {
+        throw new Error(err.response.data.message);
+      }
     }
 
     // 2. Direct fallback attempt to backend server
@@ -280,21 +281,16 @@ export const authService = {
 
       const data = await directRes.json().catch(() => ({}));
       if (directRes.ok && data.success) {
-        if (data.otpCode) {
-          sessionStorage.setItem(`looop_preview_otp_${cleanEmail}`, data.otpCode);
-        }
         return {
           success: true,
-          delivered: data.delivered !== false,
-          otpCode: data.otpCode,
           message: data.message || 'A 6-digit verification code has been sent to your email.'
         };
       }
     } catch (directErr) {
-      // continue to Brevo direct fallback
+      // continue to Brevo direct dispatch fallback
     }
 
-    // 3. Direct Brevo REST API fallback (ensures 100% email dispatch)
+    // 3. Direct Brevo REST API fallback (dispatches real email to inbox)
     try {
       const brevoKey = (import.meta.env?.VITE_BREVO_API_KEY || '').trim();
       if (!brevoKey) {
@@ -330,7 +326,6 @@ export const authService = {
           code: generatedCode,
           expiresAt: Date.now() + 10 * 60 * 1000
         }));
-        sessionStorage.setItem(`looop_preview_otp_${cleanEmail}`, generatedCode);
         try {
           await neonDb.query(
             `INSERT INTO otp_tokens (id, email, hashed_otp, purpose, expires_at, created_at)
@@ -340,8 +335,6 @@ export const authService = {
         } catch {}
         return {
           success: true,
-          delivered: true,
-          otpCode: generatedCode,
           message: 'A 6-digit verification code has been dispatched to your email via Brevo.'
         };
       }
@@ -349,27 +342,7 @@ export const authService = {
       console.warn('[authService.sendOtp] Direct Brevo dispatch notice:', brevoErr.message);
     }
 
-    // 4. Resilient Fallback: Generate code directly so user is never blocked
-    const fallbackCode = String(Math.floor(100000 + Math.random() * 900000));
-    sessionStorage.setItem(`looop_otp_${cleanEmail}_${purpose}`, JSON.stringify({
-      code: fallbackCode,
-      expiresAt: Date.now() + 10 * 60 * 1000
-    }));
-    sessionStorage.setItem(`looop_preview_otp_${cleanEmail}`, fallbackCode);
-    try {
-      await neonDb.query(
-        `INSERT INTO otp_tokens (id, email, hashed_otp, purpose, expires_at, created_at)
-         VALUES ($1, $2, $3, $4, NOW() + INTERVAL '10 minutes', NOW())`,
-        [`otp_${Date.now()}`, cleanEmail, fallbackCode, purpose]
-      );
-    } catch {}
-
-    return {
-      success: true,
-      delivered: false,
-      otpCode: fallbackCode,
-      message: `Verification code generated: ${fallbackCode}. Enter this code to proceed.`
-    };
+    throw new Error('Could not send verification email. Please verify your email address and try again.');
   },
 
   /**
