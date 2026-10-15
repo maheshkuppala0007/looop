@@ -5,10 +5,12 @@ import Button from '../common/Button';
 import LooopLogo from '../common/LooopLogo';
 import LocationBadge from '../location/LocationBadge';
 import { useAuth } from '../../context/AuthContext';
+import { useSiteConfig } from '../../context/SiteConfigContext';
 
 export const Navbar = () => {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
+  const { siteConfig } = useSiteConfig();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -30,6 +32,13 @@ export const Navbar = () => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
+
+  const navLinks = (siteConfig?.navLinks || [
+    { id: 'home', label: 'Home', path: '/', visible: true },
+    { id: 'browse', label: 'Browse', path: '/browse', visible: true },
+    { id: 'how-it-works', label: 'How It Works', path: '/how-it-works', visible: true },
+    { id: 'about', label: 'About', path: '/about', visible: true }
+  ]).filter((link) => link.visible !== false);
 
   return (
     <header
@@ -56,8 +65,14 @@ export const Navbar = () => {
           gap: '1.5rem'
         }}
       >
-        {/* LOOOP Brand Mark */}
-        <LooopLogo size="md" showTagline={false} linkTo="/" />
+        {/* Dynamic LOOOP Brand Mark */}
+        <LooopLogo
+          size="md"
+          showTagline={false}
+          linkTo="/"
+          customText={siteConfig?.logoText || siteConfig?.siteName || 'Looop'}
+          customUrl={siteConfig?.logoUrl || ''}
+        />
 
         {/* Desktop Primary Navigation */}
         <nav
@@ -71,125 +86,47 @@ export const Navbar = () => {
           className="desktop-nav"
           aria-label="Main Navigation"
         >
-          <Link
-            to="/"
-            style={{
-              color: isActive('/') ? 'var(--color-primary-600)' : 'var(--color-slate-600)',
-              fontWeight: isActive('/') ? 700 : 500,
-              textDecoration: 'none',
-              transition: 'color var(--transition-fast)',
-              position: 'relative',
-              padding: '6px 0'
-            }}
-            className="nav-link"
-          >
-            Home
-            {isActive('/') && (
-              <span
-                style={{
-                  position: 'absolute',
-                  bottom: '0',
-                  left: '0',
-                  right: '0',
-                  height: '2px',
-                  backgroundColor: 'var(--color-primary-500)',
-                  borderRadius: '2px'
-                }}
-              />
-            )}
-          </Link>
+          {navLinks.map((link) => {
+            const active = isActive(link.path);
+            const isBrowse = link.path.includes('browse');
+            const isHowItWorks = link.path.includes('how-it-works');
 
-          <Link
-            to="/browse"
-            style={{
-              color: isActive('/browse') ? 'var(--color-primary-600)' : 'var(--color-slate-600)',
-              fontWeight: isActive('/browse') ? 700 : 500,
-              textDecoration: 'none',
-              transition: 'color var(--transition-fast)',
-              position: 'relative',
-              padding: '6px 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}
-            className="nav-link"
-          >
-            <Search size={15} />
-            <span>Browse</span>
-            {isActive('/browse') && (
-              <span
+            return (
+              <Link
+                key={link.id || link.path}
+                to={link.path}
                 style={{
-                  position: 'absolute',
-                  bottom: '0',
-                  left: '0',
-                  right: '0',
-                  height: '2px',
-                  backgroundColor: 'var(--color-primary-500)',
-                  borderRadius: '2px'
+                  color: active ? 'var(--color-primary-600)' : 'var(--color-slate-600)',
+                  fontWeight: active ? 700 : 500,
+                  textDecoration: 'none',
+                  transition: 'color var(--transition-fast)',
+                  position: 'relative',
+                  padding: '6px 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
                 }}
-              />
-            )}
-          </Link>
-
-          <Link
-            to="/how-it-works"
-            style={{
-              color: isActive('/how-it-works') ? 'var(--color-primary-600)' : 'var(--color-slate-600)',
-              fontWeight: isActive('/how-it-works') ? 700 : 500,
-              textDecoration: 'none',
-              transition: 'color var(--transition-fast)',
-              position: 'relative',
-              padding: '6px 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}
-            className="nav-link"
-          >
-            <HelpCircle size={15} />
-            <span>How It Works</span>
-            {isActive('/how-it-works') && (
-              <span
-                style={{
-                  position: 'absolute',
-                  bottom: '0',
-                  left: '0',
-                  right: '0',
-                  height: '2px',
-                  backgroundColor: 'var(--color-primary-500)',
-                  borderRadius: '2px'
-                }}
-              />
-            )}
-          </Link>
-
-          <Link
-            to="/about"
-            style={{
-              color: isActive('/about') ? 'var(--color-primary-600)' : 'var(--color-slate-600)',
-              fontWeight: isActive('/about') ? 700 : 500,
-              textDecoration: 'none',
-              transition: 'color var(--transition-fast)',
-              position: 'relative',
-              padding: '6px 0'
-            }}
-            className="nav-link"
-          >
-            About
-            {isActive('/about') && (
-              <span
-                style={{
-                  position: 'absolute',
-                  bottom: '0',
-                  left: '0',
-                  right: '0',
-                  height: '2px',
-                  backgroundColor: 'var(--color-primary-500)',
-                  borderRadius: '2px'
-                }}
-              />
-            )}
-          </Link>
+                className="nav-link"
+              >
+                {isBrowse && <Search size={15} />}
+                {isHowItWorks && <HelpCircle size={15} />}
+                <span>{link.label}</span>
+                {active && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      bottom: '0',
+                      left: '0',
+                      right: '0',
+                      height: '2px',
+                      backgroundColor: 'var(--color-primary-500)',
+                      borderRadius: '2px'
+                    }}
+                  />
+                )}
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Right Section: Location Badge & Auth Actions */}
@@ -260,62 +197,32 @@ export const Navbar = () => {
             animation: 'fadeIn 0.2s ease-out'
           }}
         >
-          <Link
-            to="/"
-            onClick={() => setMobileMenuOpen(false)}
-            style={{
-              color: isActive('/') ? 'var(--color-primary-600)' : 'var(--color-slate-800)',
-              fontWeight: 600,
-              textDecoration: 'none',
-              fontSize: '1rem'
-            }}
-          >
-            Home
-          </Link>
-          <Link
-            to="/browse"
-            onClick={() => setMobileMenuOpen(false)}
-            style={{
-              color: isActive('/browse') ? 'var(--color-primary-600)' : 'var(--color-slate-800)',
-              fontWeight: 600,
-              textDecoration: 'none',
-              fontSize: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <Search size={16} />
-            <span>Browse Items</span>
-          </Link>
-          <Link
-            to="/how-it-works"
-            onClick={() => setMobileMenuOpen(false)}
-            style={{
-              color: isActive('/how-it-works') ? 'var(--color-primary-600)' : 'var(--color-slate-800)',
-              fontWeight: 600,
-              textDecoration: 'none',
-              fontSize: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <HelpCircle size={16} />
-            <span>How It Works</span>
-          </Link>
-          <Link
-            to="/about"
-            onClick={() => setMobileMenuOpen(false)}
-            style={{
-              color: isActive('/about') ? 'var(--color-primary-600)' : 'var(--color-slate-800)',
-              fontWeight: 600,
-              textDecoration: 'none',
-              fontSize: '1rem'
-            }}
-          >
-            About LOOOP
-          </Link>
+          {navLinks.map((link) => {
+            const active = isActive(link.path);
+            const isBrowse = link.path.includes('browse');
+            const isHowItWorks = link.path.includes('how-it-works');
+
+            return (
+              <Link
+                key={`mobile-${link.id || link.path}`}
+                to={link.path}
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  color: active ? 'var(--color-primary-600)' : 'var(--color-slate-800)',
+                  fontWeight: active ? 700 : 600,
+                  textDecoration: 'none',
+                  fontSize: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {isBrowse && <Search size={16} />}
+                {isHowItWorks && <HelpCircle size={16} />}
+                <span>{link.label}</span>
+              </Link>
+            );
+          })}
 
           <hr style={{ borderColor: 'var(--color-slate-100)', margin: '4px 0' }} />
 

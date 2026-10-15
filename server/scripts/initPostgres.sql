@@ -497,3 +497,56 @@ CREATE INDEX IF NOT EXISTS idx_outbox_email ON email_outbox(recipient_email);
 CREATE INDEX IF NOT EXISTS idx_outbox_user ON email_outbox(recipient_user_id);
 CREATE INDEX IF NOT EXISTS idx_outbox_created ON email_outbox(created_at DESC);
 
+-- ----------------------------------------------------------------------------
+-- 21. SITE REVIEWS (Platform Testimonials) TABLE
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS site_reviews (
+  id VARCHAR(64) PRIMARY KEY,
+  person VARCHAR(120) NOT NULL,
+  role VARCHAR(150) NOT NULL DEFAULT 'Community Member',
+  item VARCHAR(150) DEFAULT 'Platform Experience',
+  rating INT NOT NULL DEFAULT 5,
+  quote TEXT NOT NULL,
+  avatar TEXT DEFAULT 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+  badge VARCHAR(60) DEFAULT 'Verified Member',
+  is_published BOOLEAN DEFAULT TRUE,
+  display_order INT DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_site_reviews_published ON site_reviews(is_published, display_order ASC, created_at DESC);
+
+-- ----------------------------------------------------------------------------
+-- 22. SUBSCRIBERS (Newsletter with OTP) TABLE
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS subscribers (
+  id VARCHAR(64) PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  name VARCHAR(120) DEFAULT 'Subscriber',
+  verified BOOLEAN DEFAULT FALSE,
+  status VARCHAR(30) DEFAULT 'ACTIVE',
+  verification_otp VARCHAR(255),
+  otp_expires_at TIMESTAMP WITH TIME ZONE,
+  subscribed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  verified_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscribers_email ON subscribers(email);
+CREATE INDEX IF NOT EXISTS idx_subscribers_verified ON subscribers(verified, status);
+
+-- ----------------------------------------------------------------------------
+-- 23. BROADCAST UPDATES (Admin Announcements) TABLE
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS broadcast_updates (
+  id VARCHAR(64) PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  category VARCHAR(60) DEFAULT 'Platform Update',
+  message TEXT NOT NULL,
+  recipient_count INT DEFAULT 0,
+  sent_by VARCHAR(64) DEFAULT 'Admin',
+  sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_broadcast_sent_at ON broadcast_updates(sent_at DESC);
+

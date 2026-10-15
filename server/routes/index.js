@@ -21,10 +21,15 @@ const pointsRoutes = require('./pointsRoutes');
 const locationRoutes = require('./locationRoutes');
 const mapRoutes = require('./mapRoutes');
 const webhookRoutes = require('./webhookRoutes');
+const contentRoutes = require('./contentRoutes');
 
 // Health and Diagnostics
 router.use('/health', healthRoutes);
 router.use('/webhooks', webhookRoutes);
+
+// Public CMS, Reviews, Impact & Newsletter Endpoints
+router.use('/content', contentRoutes);
+router.use('/subscribers', contentRoutes);
 
 // Admin Portal REST API
 router.use('/admin', adminRoutes);

@@ -1,14 +1,24 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-export const LooopLogo = ({ size = 'md', showTagline = false, light = false, linkTo = '/' }) => {
+export const LooopLogo = ({
+  size = 'md',
+  showTagline = false,
+  light = false,
+  linkTo = '/',
+  customText = '',
+  customUrl = '',
+  customTagline = ''
+}) => {
   const sizeMap = {
-    sm: { iconWidth: 28, iconHeight: 20, ringSize: 13, text: '1.2rem', gap: '0.5rem' },
-    md: { iconWidth: 38, iconHeight: 26, ringSize: 17, text: '1.45rem', gap: '0.75rem' },
-    lg: { iconWidth: 52, iconHeight: 36, ringSize: 24, text: '2.1rem', gap: '1rem' }
+    sm: { iconWidth: 28, iconHeight: 20, ringSize: 13, text: '1.2rem', gap: '0.5rem', imgHeight: 28 },
+    md: { iconWidth: 38, iconHeight: 26, ringSize: 17, text: '1.45rem', gap: '0.75rem', imgHeight: 36 },
+    lg: { iconWidth: 52, iconHeight: 36, ringSize: 24, text: '2.1rem', gap: '1rem', imgHeight: 48 }
   };
 
   const current = sizeMap[size] || sizeMap.md;
+  const displayText = customText || 'Looop';
+  const displayTagline = customTagline || 'Share. Reuse. Connect.';
 
   const content = (
     <div
@@ -21,62 +31,70 @@ export const LooopLogo = ({ size = 'md', showTagline = false, light = false, lin
       }}
       className="looop-brand-mark"
     >
-      {/* Creative Three Interlocking Circles (The Three O's in LOOOP) */}
-      <div
-        style={{
-          position: 'relative',
-          width: `${current.iconWidth}px`,
-          height: `${current.iconHeight}px`,
-          display: 'flex',
-          alignItems: 'center',
-          flexShrink: 0
-        }}
-        aria-hidden="true"
-      >
-        {/* Ring 1: Share (Emerald) */}
+      {customUrl ? (
+        <img
+          src={customUrl}
+          alt={displayText}
+          style={{ height: `${current.imgHeight}px`, objectFit: 'contain', borderRadius: '4px' }}
+        />
+      ) : (
+        /* Creative Three Interlocking Circles (The Three O's in LOOOP) */
         <div
           style={{
-            position: 'absolute',
-            left: '0px',
-            width: `${current.ringSize}px`,
-            height: `${current.ringSize}px`,
-            borderRadius: '50%',
-            border: `3px solid ${light ? '#34d399' : '#10b981'}`,
-            boxShadow: '0 0 10px rgba(16, 185, 129, 0.35)',
-            transition: 'transform 0.3s ease'
+            position: 'relative',
+            width: `${current.iconWidth}px`,
+            height: `${current.iconHeight}px`,
+            display: 'flex',
+            alignItems: 'center',
+            flexShrink: 0
           }}
-          className="logo-ring-1"
-        />
-        {/* Ring 2: Reuse (Teal) */}
-        <div
-          style={{
-            position: 'absolute',
-            left: `${current.iconWidth * 0.28}px`,
-            width: `${current.ringSize}px`,
-            height: `${current.ringSize}px`,
-            borderRadius: '50%',
-            border: `3px solid ${light ? '#2dd4bf' : '#0d9488'}`,
-            opacity: 0.95,
-            boxShadow: '0 0 10px rgba(13, 148, 136, 0.3)',
-            transition: 'transform 0.3s ease'
-          }}
-          className="logo-ring-2"
-        />
-        {/* Ring 3: Connect (Deep Jade) */}
-        <div
-          style={{
-            position: 'absolute',
-            left: `${current.iconWidth * 0.56}px`,
-            width: `${current.ringSize}px`,
-            height: `${current.ringSize}px`,
-            borderRadius: '50%',
-            border: `3px solid ${light ? '#6ee7b7' : '#047857'}`,
-            boxShadow: '0 0 10px rgba(4, 120, 87, 0.35)',
-            transition: 'transform 0.3s ease'
-          }}
-          className="logo-ring-3"
-        />
-      </div>
+          aria-hidden="true"
+        >
+          {/* Ring 1: Share (Emerald) */}
+          <div
+            style={{
+              position: 'absolute',
+              left: '0px',
+              width: `${current.ringSize}px`,
+              height: `${current.ringSize}px`,
+              borderRadius: '50%',
+              border: `3px solid ${light ? '#34d399' : '#10b981'}`,
+              boxShadow: '0 0 10px rgba(16, 185, 129, 0.35)',
+              transition: 'transform 0.3s ease'
+            }}
+            className="logo-ring-1"
+          />
+          {/* Ring 2: Reuse (Teal) */}
+          <div
+            style={{
+              position: 'absolute',
+              left: `${current.iconWidth * 0.28}px`,
+              width: `${current.ringSize}px`,
+              height: `${current.ringSize}px`,
+              borderRadius: '50%',
+              border: `3px solid ${light ? '#2dd4bf' : '#0d9488'}`,
+              opacity: 0.95,
+              boxShadow: '0 0 10px rgba(13, 148, 136, 0.3)',
+              transition: 'transform 0.3s ease'
+            }}
+            className="logo-ring-2"
+          />
+          {/* Ring 3: Connect (Deep Jade) */}
+          <div
+            style={{
+              position: 'absolute',
+              left: `${current.iconWidth * 0.56}px`,
+              width: `${current.ringSize}px`,
+              height: `${current.ringSize}px`,
+              borderRadius: '50%',
+              border: `3px solid ${light ? '#6ee7b7' : '#047857'}`,
+              boxShadow: '0 0 10px rgba(4, 120, 87, 0.35)',
+              transition: 'transform 0.3s ease'
+            }}
+            className="logo-ring-3"
+          />
+        </div>
+      )}
 
       {/* Brand Typography */}
       <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -90,7 +108,7 @@ export const LooopLogo = ({ size = 'md', showTagline = false, light = false, lin
             lineHeight: 1
           }}
         >
-          L<span style={{ color: light ? '#34d399' : 'var(--color-primary-500)' }}>ooo</span>p
+          {displayText}
         </span>
 
         {showTagline && (
@@ -104,7 +122,7 @@ export const LooopLogo = ({ size = 'md', showTagline = false, light = false, lin
               marginTop: '3px'
             }}
           >
-            Share. Reuse. Connect.
+            {displayTagline}
           </span>
         )}
       </div>

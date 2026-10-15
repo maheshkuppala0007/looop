@@ -58,6 +58,8 @@ const AdminAuditLogsPage = lazy(() => import('../pages/admin/AdminAuditLogsPage'
 const AdminPointsPage = lazy(() => import('../pages/admin/AdminPointsPage'));
 const AdminMessagesPage = lazy(() => import('../pages/admin/AdminMessagesPage'));
 const AdminNotificationsPage = lazy(() => import('../pages/admin/AdminNotificationsPage'));
+const AdminReviewsPage = lazy(() => import('../pages/admin/AdminReviewsPage'));
+const AdminBroadcastPage = lazy(() => import('../pages/admin/AdminBroadcastPage'));
 
 // 4. Common Pages
 const NotFound = lazy(() => import('../pages/NotFound'));
@@ -551,6 +553,36 @@ export const AppRoutes = () => {
           <ProtectedRoute requiredRole="ADMIN">
             <AdminLayout>
               <AdminAuditLogsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/reviews"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminReviewsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/broadcasts"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminBroadcastPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/updates"
+        element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLayout>
+              <AdminBroadcastPage />
             </AdminLayout>
           </ProtectedRoute>
         }

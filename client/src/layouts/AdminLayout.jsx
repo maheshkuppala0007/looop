@@ -23,7 +23,9 @@ import {
   Search,
   RefreshCw,
   Gift,
-  Clock
+  Clock,
+  Star,
+  Send
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/common/Avatar';
@@ -90,6 +92,8 @@ export const AdminLayout = ({ children }) => {
     { label: 'Reports & Disputes', path: '/admin/reports', icon: AlertTriangle, count: badgeCounts.openReports > 0 ? badgeCounts.openReports : undefined, alert: true },
     { label: 'Categories Taxonomy', path: '/admin/categories', icon: FolderTree },
     { label: 'Analytics & Impact', path: '/admin/analytics', icon: BarChart3 },
+    { label: 'Website Reviews', path: '/admin/reviews', icon: Star },
+    { label: 'Broadcast Updates', path: '/admin/broadcasts', icon: Send },
     { label: 'Platform Settings', path: '/admin/settings', icon: Settings },
     { label: 'Security Audit Logs', path: '/admin/audit-logs', icon: Shield }
   ];

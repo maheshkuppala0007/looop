@@ -4,6 +4,8 @@ const adminMiddleware = require('../middleware/adminMiddleware');
 const adminController = require('../controllers/adminController');
 const impactController = require('../controllers/impactController');
 
+const contentController = require('../controllers/contentController');
+
 // All administrative routes require strict verified administrative privileges
 router.use(adminMiddleware);
 
@@ -76,6 +78,22 @@ router.post('/impact/recalculate/:transactionId', impactController.recalculateTr
 router.get('/email/diagnostics', adminController.getEmailDiagnostics);
 router.post('/email/test', adminController.sendTestEmail);
 router.post('/email/outbox/process', adminController.processEmailOutboxQueue);
+
+// 14. Site CMS & Branding Settings (Header nav, Logo, Site name, Impact section stats)
+router.get('/site-settings', contentController.getSiteSettings);
+router.put('/site-settings', contentController.updateSiteSettings);
+
+// 15. Review Management (Create, Publish/Unpublish, Edit, Delete permanently)
+router.get('/site-reviews', contentController.getAdminReviews);
+router.post('/site-reviews', contentController.createReview);
+router.put('/site-reviews/:id', contentController.updateReview);
+router.patch('/site-reviews/:id/publish', contentController.toggleReviewPublish);
+router.delete('/site-reviews/:id', contentController.deleteReview);
+
+// 16. Broadcast Announcements (Send updates to verified subscribers & registered customers)
+router.get('/broadcasts', contentController.getBroadcasts);
+router.post('/broadcasts', contentController.sendBroadcast);
+router.get('/subscribers', contentController.getSubscribers);
 
 module.exports = router;
 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSiteConfig } from '../../context/SiteConfigContext';
 import AuthPromptModal from '../../components/common/AuthPromptModal';
-import impactService from '../../services/impactService';
+import contentService from '../../services/contentService';
 import { getLiveImpactMetrics, saveLiveImpactMetrics } from '../../utils/communityImpactTracker';
 import {
   Sparkles,
@@ -29,7 +30,8 @@ import {
   Shirt,
   Wrench,
   ChevronRight,
-  Key
+  Key,
+  Star
 } from 'lucide-react';
 import LooopHeroCanvas from '../../components/3d/LooopHeroCanvas';
 import ItemCard from '../../components/common/ItemCard';
@@ -41,39 +43,100 @@ import { itemService } from '../../services/itemService';
 import { mockCommunityImpact, mockCategories } from '../../data/mockData';
 import AmazonItemCarousel from '../../components/home/AmazonItemCarousel';
 
+const INITIAL_THREE_REVIEWS = [
+  {
+    id: 'srev_1',
+    person: 'Aarav Sharma',
+    role: 'Engineering Student · Indiranagar',
+    item: 'Casio Scientific Calculator',
+    rating: 5,
+    quote: '“LOOOP completely transformed how our community shares resources! Instead of spending thousands on items I only need once, I found trustworthy neighbors ready to help. The secure handover code makes every transaction feel completely safe and professional.”',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+    badge: 'Verified Borrower'
+  },
+  {
+    id: 'srev_2',
+    person: 'Ananya Deshmukh',
+    role: 'Graduating Senior · HSR Layout',
+    item: 'Calculus & Physics Book Set',
+    rating: 5,
+    quote: '“This website is an absolute game-changer. LOOOP brings true circular reuse into daily life with zero sales pressure, zero commercial ads, and 100% verified trust. Watching real waste avoided in our neighborhood gives real meaning to sharing.”',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
+    badge: 'Verified Sharer'
+  },
+  {
+    id: 'srev_3',
+    person: 'Sunil Kumar',
+    role: 'Resident · JP Nagar Phase 3',
+    item: 'Cordless Impact Drill & Bit Set',
+    rating: 5,
+    quote: '“I am genuinely impressed by how smoothly LOOOP works. My idle household tools and books are now helping students and families around me. High praise to Mahesh and the LOOOP team for building such a useful, clean, and honest platform!”',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&auto=format&fit=crop&q=80',
+    badge: 'Top Contributor'
+  }
+];
+
 export const LandingPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAuthModal, setShowAuthModal] = useState(false);
-  // Instant zero-millisecond render from cache (never flashes empty or reloads from scratch)
   const [realItems, setRealItems] = useState(() => itemService.getCachedItems(24));
-  const [liveImpact, setLiveImpact] = useState(() => getLiveImpactMetrics());
+  // Live impact counts start strictly at 0 and increment as actions occur
+  const [liveImpact, setLiveImpact] = useState({
+    itemsReused: 0,
+    peopleHelped: 0,
+    booksShared: 0,
+    electronicsShared: 0,
+    wasteAvoidedKg: 0
+  });
+  const [reviews, setReviews] = useState(INITIAL_THREE_REVIEWS);
   const { user, isAuthenticated } = useAuth();
+  const { siteConfig } = useSiteConfig();
   const navigate = useNavigate();
 
   useEffect(() => {
     let isMounted = true;
+
+    // Fetch items
     const fetchItems = async () => {
       try {
         const res = await itemService.getItems({ limit: 24 });
         if (isMounted) {
           const itemsFromDb = (res?.items || []).filter((i) => !itemService.isMockItem(i));
           setRealItems(itemsFromDb);
-          const metrics = getLiveImpactMetrics();
-          const books = itemsFromDb.filter((i) => (i.category || '').toLowerCase() === 'books').length;
-          const electronics = itemsFromDb.filter((i) => (i.category || '').toLowerCase() === 'electronics').length;
-          setLiveImpact({
-            itemsReused: Math.max(metrics.itemsReused, itemsFromDb.length),
-            peopleHelped: Math.max(metrics.peopleHelped, itemsFromDb.length > 0 ? 1 : 0),
-            booksShared: Math.max(metrics.booksShared, books),
-            electronicsShared: Math.max(metrics.electronicsShared, electronics),
-            wasteAvoidedKg: Math.max(metrics.wasteAvoidedKg, Math.round(itemsFromDb.length * 2.5))
-          });
         }
       } catch (err) {
         console.warn('Silent background item sync notice:', err);
       }
     };
+
+    // Fetch real live impact counts from backend database
+    const fetchImpact = async () => {
+      try {
+        const res = await contentService.getLiveImpactStats();
+        if (isMounted && res?.success && res.metrics) {
+          setLiveImpact(res.metrics);
+        }
+      } catch (err) {
+        console.warn('Silent impact sync notice:', err);
+      }
+    };
+
+    // Fetch approved website-appreciating reviews
+    const fetchReviews = async () => {
+      try {
+        const res = await contentService.getPublicReviews();
+        if (isMounted && res?.success && res.reviews && res.reviews.length > 0) {
+          setReviews(res.reviews);
+        }
+      } catch (err) {
+        console.warn('Silent reviews sync notice:', err);
+      }
+    };
+
     fetchItems();
+    fetchImpact();
+    fetchReviews();
+
     return () => { isMounted = false; };
   }, []);
 
@@ -639,7 +702,7 @@ export const LandingPage = () => {
             </h2>
             <p style={{ color: 'var(--color-slate-600)', fontSize: '1.05rem', lineHeight: 1.65 }}>
               “Your unused item could be exactly what someone else needs.”
-              See how members across campus dorms and local neighborhoods rate their experience sharing on LOOOP.
+              See how verified members appreciate the platform, trust the handover system, and build a greener neighborhood.
             </p>
           </div>
 
@@ -650,45 +713,8 @@ export const LandingPage = () => {
               gap: '2rem'
             }}
           >
-            {[
-              {
-                person: 'Aarav Sharma',
-                role: 'Engineering Student · Indiranagar',
-                item: 'Casio Scientific Calculator',
-                rating: 5,
-                quote: '“I needed a Casio 991ES for semester math exams. A neighbor 1.2 km away lent it to me for 5 days. Saved money and avoided buying a calculator I only needed for a week.”',
-                avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-                badge: 'Verified Borrower'
-              },
-              {
-                person: 'Ananya Deshmukh',
-                role: 'Graduating Senior · HSR Layout',
-                item: 'Calculus & Physics Book Set',
-                rating: 5,
-                quote: '“Instead of throwing out my heavy university textbooks, I gifted them to a junior mechanical student. They picked it up from my apartment gate that evening.”',
-                avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-                badge: 'Verified Sharer'
-              },
-              {
-                person: 'Sunil Kumar',
-                role: 'Resident · JP Nagar Phase 3',
-                item: 'Cordless Impact Drill & Bit Set',
-                rating: 5,
-                quote: '“I only use my power drill once every few months. Lending it to neighbors for weekend bookshelf and picture frame assembly gives the tool real utility.”',
-                avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&auto=format&fit=crop&q=80',
-                badge: '100% On-Time Returns'
-              },
-              {
-                person: 'Tanvi Nair',
-                role: 'UI Designer · Koramangala',
-                item: 'Wacom Graphics Tablet',
-                rating: 5,
-                quote: '“Exchanged my unused drawing tablet for a desk lamp. The handover code verification process made the entire exchange feel super secure and seamless.”',
-                avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&auto=format&fit=crop&q=80',
-                badge: 'Verified Exchange'
-              }
-            ].map((story, i) => (
-              <Card key={i} hoverable className="feature-highlight-card">
+            {reviews.slice(0, 3).map((story, i) => (
+              <Card key={story.id || i} hoverable className="feature-highlight-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem' }}>
                   <Avatar src={story.avatar} name={story.person} size="lg" />
                   <div>
@@ -699,7 +725,7 @@ export const LandingPage = () => {
                       {story.role}
                     </span>
                     <div style={{ display: 'flex', gap: '2px', marginTop: '4px', color: '#f59e0b' }}>
-                      {'★'.repeat(story.rating)}
+                      {'★'.repeat(story.rating || 5)}
                     </div>
                   </div>
                 </div>
@@ -718,7 +744,7 @@ export const LandingPage = () => {
                 >
                   <Gift size={15} color="var(--color-primary-600)" />
                   <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-primary-800)' }}>
-                    Item: {story.item}
+                    Item / Experience: {story.item}
                   </span>
                 </div>
 
@@ -727,7 +753,7 @@ export const LandingPage = () => {
                 </p>
 
                 <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-slate-100)' }}>
-                  <Badge variant="success">{story.badge}</Badge>
+                  <Badge variant="success">{story.badge || 'Verified Member'}</Badge>
                 </div>
               </Card>
             ))}
@@ -739,6 +765,7 @@ export const LandingPage = () => {
           4. REDUCING WASTE THROUGH CIRCULAR REUSE & IMPACT CALCULATOR SECTION
           ========================================================================= */}
       <section
+        id="impact"
         style={{
           padding: '5.5rem 0',
           background: `
@@ -769,13 +796,13 @@ export const LandingPage = () => {
               }}
             >
               <Sparkles size={14} />
-              <span>Verified Community Impact</span>
+              <span>{siteConfig?.impactSection?.badge || 'Verified Community Impact'}</span>
             </span>
             <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.6rem)', fontWeight: 800, color: '#ffffff', marginBottom: '1rem', letterSpacing: '-0.025em' }}>
-              Reducing Waste Through Circular Reuse
+              {siteConfig?.impactSection?.title || 'Reducing Waste Through Circular Reuse'}
             </h2>
             <p style={{ color: '#cbd5e1', fontSize: '1.05rem', lineHeight: 1.65 }}>
-              Every item borrowed or gifted on LOOOP represents one less product manufactured, shipped in single-use plastic, or buried in a landfill.
+              {siteConfig?.impactSection?.subtitle || 'Every item borrowed or gifted on LOOOP represents one less product manufactured, shipped in single-use plastic, or buried in a landfill.'}
             </p>
           </div>
 
@@ -787,64 +814,80 @@ export const LandingPage = () => {
               textAlign: 'center'
             }}
           >
-            {[
-              { label: 'Items Reused', value: liveImpact.itemsReused, icon: RefreshCw, desc: 'Active items in community use' },
-              { label: 'People Helped', value: liveImpact.peopleHelped, icon: Users, desc: 'Neighbors connected' },
-              { label: 'Books Shared', value: liveImpact.booksShared, icon: BookOpen, desc: 'Study sets & novels' },
-              { label: 'Electronics Shared', value: liveImpact.electronicsShared, icon: Laptop, desc: 'Gadgets & peripherals' },
-              { label: 'Waste Avoided', value: `${liveImpact.wasteAvoidedKg} kg`, icon: TrendingUp, desc: 'Solid waste kept out of landfills' }
-            ].map((stat, i) => {
-              const Icon = stat.icon;
-              return (
-                <div
-                  key={i}
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: '2rem 1.25rem',
-                    backdropFilter: 'blur(10px)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center'
-                  }}
-                >
+            {(() => {
+              const hidden = siteConfig?.impactSection?.hiddenCards || [];
+              const defaultCards = [
+                { id: 'itemsReused', label: 'Items Reused', value: liveImpact.itemsReused, icon: RefreshCw, desc: 'Active items in community use' },
+                { id: 'peopleHelped', label: 'People Helped', value: liveImpact.peopleHelped, icon: Users, desc: 'Neighbors connected' },
+                { id: 'booksShared', label: 'Books Shared', value: liveImpact.booksShared, icon: BookOpen, desc: 'Study sets & novels' },
+                { id: 'electronicsShared', label: 'Electronics Shared', value: liveImpact.electronicsShared, icon: Laptop, desc: 'Gadgets & peripherals' },
+                { id: 'wasteAvoided', label: 'Waste Avoided', value: `${liveImpact.wasteAvoidedKg} kg`, icon: TrendingUp, desc: 'Solid waste kept out of landfills' }
+              ];
+
+              const customCards = (siteConfig?.impactSection?.customCards || []).map((c) => ({
+                id: c.id || `custom-${c.label}`,
+                label: c.label,
+                value: c.value,
+                icon: Users,
+                desc: c.desc || 'Active community members'
+              }));
+
+              const allCards = [...defaultCards, ...customCards].filter((card) => !hidden.includes(card.id));
+
+              return allCards.map((stat, i) => {
+                const Icon = stat.icon;
+                return (
                   <div
+                    key={stat.id || i}
                     style={{
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '50%',
-                      backgroundColor: 'rgba(16, 185, 129, 0.25)',
-                      color: '#a7f3d0',
+                      backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: 'var(--radius-lg)',
+                      padding: '2rem 1.25rem',
+                      backdropFilter: 'blur(10px)',
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      marginBottom: '1rem'
+                      transition: 'transform 0.2s, background-color 0.2s'
                     }}
                   >
-                    <Icon size={22} />
+                    <div
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(16, 185, 129, 0.25)',
+                        color: '#a7f3d0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: '1rem'
+                      }}
+                    >
+                      <Icon size={22} />
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '2.5rem',
+                        fontWeight: 900,
+                        fontFamily: 'var(--font-brand)',
+                        color: '#ffffff',
+                        marginBottom: '0.35rem',
+                        lineHeight: 1.1
+                      }}
+                    >
+                      {stat.value}
+                    </div>
+                    <div style={{ fontSize: '0.95rem', color: '#f8fafc', fontWeight: 700, marginBottom: '0.25rem' }}>
+                      {stat.label}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                      {stat.desc}
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      fontSize: '2.5rem',
-                      fontWeight: 900,
-                      fontFamily: 'var(--font-brand)',
-                      color: '#ffffff',
-                      marginBottom: '0.35rem',
-                      lineHeight: 1.1
-                    }}
-                  >
-                    {stat.value}
-                  </div>
-                  <div style={{ fontSize: '0.95rem', color: '#f8fafc', fontWeight: 700, marginBottom: '0.25rem' }}>
-                    {stat.label}
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                    {stat.desc}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         </div>
       </section>

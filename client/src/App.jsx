@@ -5,6 +5,7 @@ import { LocationProvider } from './context/LocationContext';
 import { ToastProvider } from './context/ToastContext';
 import { SocketProvider } from './context/SocketContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { SiteConfigProvider } from './context/SiteConfigContext';
 import OfflineBanner from './components/common/OfflineBanner';
 import LocationPromptModal from './components/location/LocationPromptModal';
 import AppRoutes from './routes/AppRoutes';
@@ -15,13 +16,15 @@ export const App = () => {
       <LocationProvider>
         <SocketProvider>
           <ToastProvider>
-            <BrowserRouter>
-              <OfflineBanner />
-              <LocationPromptModal />
-              <NotificationProvider>
-                <AppRoutes />
-              </NotificationProvider>
-            </BrowserRouter>
+            <SiteConfigProvider>
+              <BrowserRouter>
+                <OfflineBanner />
+                <LocationPromptModal />
+                <NotificationProvider>
+                  <AppRoutes />
+                </NotificationProvider>
+              </BrowserRouter>
+            </SiteConfigProvider>
           </ToastProvider>
         </SocketProvider>
       </LocationProvider>
