@@ -228,7 +228,7 @@ export const RegisterPage = () => {
       });
       setTimeout(() => inlineOtpRefs.current[0]?.focus(), 150);
     } catch (err) {
-      setInlineOtpError(err.message || 'Failed to dispatch verification code via Brevo Email. Please try again.');
+      setInlineOtpError(err.message || 'Failed to dispatch verification code to your email. Please try again.');
     } finally {
       setIsCheckingEmailDb(false);
     }
@@ -603,7 +603,7 @@ export const RegisterPage = () => {
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
             borderRadius: '24px',
-            padding: '2rem 1.5rem',
+            padding: 'clamp(1.5rem, 5vw, 2.25rem) clamp(1rem, 4vw, 1.5rem)',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
             color: '#0f172a',
             position: 'relative',
@@ -693,7 +693,7 @@ export const RegisterPage = () => {
                   Verify Your Email Address
                 </h2>
                 <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '6px', lineHeight: 1.5 }}>
-                  We have dispatched a 6-digit verification code via <strong>Brevo Email</strong> to:
+                  We have sent a 6-digit verification code to your email:
                 </p>
                 <div style={{
                   display: 'inline-block',
@@ -710,9 +710,20 @@ export const RegisterPage = () => {
                   {email}
                 </div>
               </div>
-
               <form onSubmit={handleVerifyOtpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: 'clamp(3px, 1.2vw, 6px)',
+                    width: '100%',
+                    maxWidth: '100%',
+                    margin: '0 auto',
+                    boxSizing: 'border-box',
+                    padding: '0 2px'
+                  }}
+                >
                   {otpDigits.map((digit, idx) => (
                     <input
                       key={idx}
@@ -727,17 +738,21 @@ export const RegisterPage = () => {
                       onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                       onPaste={handleOtpPaste}
                       style={{
-                        width: '42px',
-                        height: '50px',
+                        flex: '1 1 0',
+                        width: '100%',
+                        maxWidth: '46px',
+                        minWidth: '28px',
+                        height: 'clamp(42px, 11vw, 50px)',
                         textAlign: 'center',
-                        fontSize: '1.35rem',
+                        fontSize: 'clamp(1.1rem, 4.2vw, 1.35rem)',
                         fontWeight: 800,
                         borderRadius: '10px',
-                        border: '2px solid #cbd5e1',
+                        border: digit ? '2px solid #059669' : '2px solid #cbd5e1',
                         backgroundColor: '#ffffff',
                         color: '#047857',
                         outline: 'none',
-                        boxSizing: 'border-box'
+                        boxSizing: 'border-box',
+                        padding: 0
                       }}
                     />
                   ))}
@@ -774,7 +789,7 @@ export const RegisterPage = () => {
                       textDecoration: 'underline'
                     }}
                   >
-                    {isSendingOtp ? 'Sending...' : 'Resend Code via Brevo'}
+                    {isSendingOtp ? 'Sending...' : 'Resend Code'}
                   </button>
                 )}
               </div>
@@ -1038,7 +1053,18 @@ export const RegisterPage = () => {
                         Enter 6-digit OTP code sent to <strong>{email.trim()}</strong>:
                       </div>
 
-                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          gap: 'clamp(4px, 1.8vw, 8px)',
+                          width: '100%',
+                          maxWidth: '360px',
+                          margin: '0 auto',
+                          boxSizing: 'border-box'
+                        }}
+                      >
                         {inlineOtpDigits.map((digit, idx) => (
                           <input
                             key={idx}
@@ -1076,17 +1102,21 @@ export const RegisterPage = () => {
                               }
                             }}
                             style={{
-                              width: '36px',
-                              height: '42px',
+                              flex: '1 1 0',
+                              width: '100%',
+                              maxWidth: '46px',
+                              minWidth: '0',
+                              height: 'clamp(40px, 11vw, 48px)',
                               textAlign: 'center',
-                              fontSize: '1.2rem',
+                              fontSize: 'clamp(1.1rem, 4vw, 1.35rem)',
                               fontWeight: 800,
                               borderRadius: '8px',
-                              border: '1.5px solid #cbd5e1',
+                              border: digit ? '2px solid #059669' : '1.5px solid #cbd5e1',
                               backgroundColor: '#ffffff',
                               color: '#047857',
                               outline: 'none',
-                              boxSizing: 'border-box'
+                              boxSizing: 'border-box',
+                              padding: 0
                             }}
                           />
                         ))}

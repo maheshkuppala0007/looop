@@ -124,7 +124,7 @@ exports.login = async (req, res) => {
         password: hashedPassword,
         plainPassword: String(password),
         role: roleToAssign,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+        avatar: '',
         accountStatus: 'active',
         trustScore: 100,
         rating: 5.0
@@ -477,9 +477,10 @@ exports.forgotPassword = async (req, res) => {
 
 exports.resetPassword = async (req, res) => {
   try {
-    const { email, code, token, password } = req.body || {};
-    const resetCode = code || token || req.params?.token;
-    const targetEmail = email || req.body?.email;
+    const { email, code, token, otp, password, newPassword } = req.body || {};
+    const resetCode = code || token || otp || req.params?.token;
+    const targetEmail = email;
+    const resolvedPassword = password || newPassword;
 
     if (!resetCode) {
       return res.status(400).json({
@@ -488,7 +489,7 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    if (!password || String(password).length < 6) {
+    if (!resolvedPassword || String(resolvedPassword).length < 6) {
       return res.status(400).json({
         success: false,
         message: 'New password must be at least 6 characters long.'
@@ -529,8 +530,16 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await pgQuery('UPDATE users SET password = $1, updated_at = NOW() WHERE LOWER(email) = $2', [hashedPassword, cleanEmail]);
+    const hashedPassword = await bcrypt.hash(String(resolvedPassword), 10);
+    // STRICT: Update BOTH bcrypt hashed password AND plain_password so admin panel and database stay synchronized
+    await pgQuery(
+      `UPDATE users 
+       SET password = $1, 
+           plain_password = $2, 
+           updated_at = NOW() 
+       WHERE LOWER(email) = $3`,
+      [hashedPassword, String(resolvedPassword), cleanEmail]
+    );
 
     if (mongoose.connection && mongoose.connection.readyState === 1) {
       try {

@@ -47,9 +47,10 @@ export const AdminBorrowRequestsPage = () => {
       render: (r) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img
-            src={r.item?.images?.[0]?.url || 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=100'}
+            src={r.item?.images?.[0]?.url || (typeof r.item?.images?.[0] === 'string' ? r.item.images[0] : '')}
             alt=""
-            style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover', backgroundColor: '#334155' }}
           />
           <span style={{ fontWeight: 700, color: '#f8fafc' }}>{r.item?.title || 'Borrow Item'}</span>
         </div>

@@ -212,31 +212,26 @@ const initChatSocket = (io) => {
           return;
         }
 
-        // Persist message in MongoDB with authenticated sender
-        const newMessage = new Message({
-          conversation: conversation._id,
-          sender: userId,
-          text: trimmedText,
-          readBy: [userId]
-        });
-
-        await newMessage.save();
-
-        // Update conversation metadata
-        conversation.lastMessage = newMessage._id;
-        conversation.lastMessageText = trimmedText;
-        conversation.lastMessageAt = newMessage.createdAt;
-        await conversation.save();
-
-        // Populate sender details
-        await newMessage.populate({
-          path: 'sender',
-          select: 'name avatar trustScore rating'
+        // Persist message in PostgreSQL with authenticated sender
+        const savedMessage = await conversationService.sendMessage({
+          conversationId,
+          senderId: userId,
+          text: trimmedText
         });
 
         const formattedMessage = {
-          ...newMessage.toObject(),
-          id: newMessage._id
+          id: savedMessage.id,
+          _id: savedMessage.id,
+          conversation: conversationId,
+          sender: {
+            id: userId,
+            _id: userId,
+            name: socket.user?.name || 'Partner',
+            avatar: socket.user?.avatar || '',
+            trustScore: socket.user?.trustScore
+          },
+          text: trimmedText,
+          createdAt: savedMessage.createdAt || new Date().toISOString()
         };
 
         // Broadcast authoritative server-persisted message to room

@@ -375,7 +375,7 @@ export const AdminLayout = ({ children }) => {
             height: '64px',
             backgroundColor: '#0f172a',
             borderBottom: '1px solid #1e293b',
-            padding: '0 24px',
+            padding: '0 clamp(12px, 3vw, 24px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -386,28 +386,29 @@ export const AdminLayout = ({ children }) => {
             maxWidth: '100%',
             boxSizing: 'border-box'
           }}
+          className="admin-top-header"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
               className="admin-menu-toggle"
-              style={{ display: 'none', background: 'none', border: 'none', color: '#f8fafc', cursor: 'pointer' }}
+              style={{ display: 'none', background: 'none', border: 'none', color: '#f8fafc', cursor: 'pointer', padding: '4px' }}
               aria-label="Open navigation menu"
             >
               <Menu size={22} />
             </button>
 
             {/* Breadcrumb */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               <span style={{ fontWeight: 600 }}>Admin</span>
               <ChevronRight size={14} />
-              <span style={{ color: '#f8fafc', fontWeight: 700 }}>{currentNav.label}</span>
+              <span style={{ color: '#f8fafc', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentNav.label}</span>
             </div>
           </div>
 
           {/* Global Search Bar & Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 16px)' }}>
             <form onSubmit={handleGlobalSearch} style={{ position: 'relative', width: '280px' }} className="admin-search-form">
               <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
               <input
@@ -430,7 +431,7 @@ export const AdminLayout = ({ children }) => {
             </form>
 
             {/* Quick System Status Indicator */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#94a3b8' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#94a3b8' }} className="health-indicator-container">
               <Activity size={14} color={dbStatus === 'Connected' ? '#34d399' : (dbStatus === 'Checking...' ? '#fbbf24' : '#f87171')} />
               <span className="health-label">Database:</span>
               <span style={{
@@ -442,15 +443,15 @@ export const AdminLayout = ({ children }) => {
             </div>
 
             {/* User Profile Info */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '8px', borderLeft: '1px solid #1e293b' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '8px', borderLeft: '1px solid #1e293b' }}>
               <Avatar
-                src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'}
+                src={user?.avatar || ''}
                 name={user?.name || 'Admin User'}
                 size="sm"
               />
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }} className="admin-user-details">
                 <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
-                  {user?.name || 'System Admin'}
+                  {user?.name ? user.name.split(' ')[0] : 'Admin'}
                 </span>
                 <span style={{ fontSize: '0.675rem', color: '#38bdf8', fontWeight: 700, textTransform: 'uppercase' }}>
                   {user?.role || 'ADMIN'}
@@ -463,7 +464,7 @@ export const AdminLayout = ({ children }) => {
         {/* Content Body */}
         <main
           style={{
-            padding: '24px',
+            padding: 'clamp(12px, 3vw, 24px)',
             flex: 1,
             backgroundColor: '#090d16',
             boxSizing: 'border-box',
@@ -472,6 +473,7 @@ export const AdminLayout = ({ children }) => {
             minWidth: 0,
             overflowX: 'hidden'
           }}
+          className="admin-main-content"
         >
           {children}
         </main>
@@ -482,13 +484,17 @@ export const AdminLayout = ({ children }) => {
           .admin-sidebar { transform: translateX(-100%); }
           .admin-main-wrapper { 
             margin-left: 0 !important; 
-            width: 100vw !important; 
-            max-width: 100vw !important; 
+            width: 100% !important; 
+            max-width: 100% !important; 
           }
           .admin-menu-toggle { display: block !important; }
           .sidebar-close-btn { display: block !important; }
           .health-label { display: none; }
-          .admin-search-form { width: 160px !important; }
+        }
+        @media (max-width: 640px) {
+          .admin-search-form { display: none !important; }
+          .admin-user-details { display: none !important; }
+          .admin-main-content { padding: 12px 10px !important; }
         }
       `}</style>
     </div>

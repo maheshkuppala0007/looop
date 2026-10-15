@@ -164,7 +164,7 @@ export const ItemCard = ({ item, onSaveToggle, isSaved: propIsSaved, isSaving = 
                 transform: imageTransformStyle || 'scale(1)'
               }}
               onError={(e) => {
-                e.target.src = 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80';
+                e.currentTarget.style.display = 'none';
               }}
             />
           ) : (

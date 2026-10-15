@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import Card from '../../components/common/Card';
 import Avatar from '../../components/common/Avatar';
+import WhatsAppDpUploader from '../../components/profile/WhatsAppDpUploader';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Tabs from '../../components/common/Tabs';
@@ -211,7 +212,14 @@ export const ProfilePage = () => {
         >
           {/* Avatar & Main Info */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center' }}>
-            <Avatar src={profileData.avatar} name={profileData.name} size="xl" />
+            <WhatsAppDpUploader
+              currentAvatar={profileData.avatar}
+              userName={profileData.name}
+              size="xl"
+              onAvatarUpdated={(newAvatar) => {
+                setProfileData((prev) => ({ ...prev, avatar: newAvatar }));
+              }}
+            />
 
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>

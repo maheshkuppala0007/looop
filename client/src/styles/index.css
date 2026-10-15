@@ -149,8 +149,9 @@ button, input, select, textarea {
   max-width: var(--container-max);
   margin-left: auto;
   margin-right: auto;
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
+  padding-left: clamp(0.75rem, 3.5vw, 1.5rem);
+  padding-right: clamp(0.75rem, 3.5vw, 1.5rem);
+  box-sizing: border-box;
 }
 
 /* Reusable Components Styling */
@@ -711,11 +712,51 @@ button, input, select, textarea {
   }
 }
 
-/* Prevent accidental horizontal page overflow */
+/* Prevent accidental horizontal page overflow & guarantee phone ratio responsiveness */
 html, body {
-  max-width: 100%;
+  max-width: 100vw;
   overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Fluid responsive OTP container & boxes */
+.otp-fluid-container {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: clamp(4px, 1.8vw, 8px) !important;
+  width: 100% !important;
+  max-width: 360px !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+}
+
+.otp-fluid-input {
+  flex: 1 1 0 !important;
+  width: 100% !important;
+  max-width: 46px !important;
+  min-width: 0 !important;
+  height: clamp(42px, 12vw, 52px) !important;
+  text-align: center !important;
+  font-size: clamp(1.15rem, 4.5vw, 1.4rem) !important;
+  font-weight: 800 !important;
+  border-radius: 10px !important;
+  outline: none !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+/* Touch and mobile phone screen adaptations */
+@media (max-width: 640px) {
+  .phone-full-width {
+    width: 100% !important;
+  }
+  .phone-stack {
+    flex-direction: column !important;
+  }
 }
 
 @import './looop-loading.css';
+
 

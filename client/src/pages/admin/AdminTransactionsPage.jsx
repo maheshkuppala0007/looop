@@ -71,9 +71,10 @@ export const AdminTransactionsPage = () => {
       render: (tx) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img
-            src={tx.item?.images?.[0]?.url || 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=100'}
+            src={tx.item?.images?.[0]?.url || (typeof tx.item?.images?.[0] === 'string' ? tx.item.images[0] : '')}
             alt=""
-            style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-xs)', objectFit: 'cover' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-xs)', objectFit: 'cover', backgroundColor: '#334155' }}
           />
           <span style={{ fontWeight: 600, color: '#f8fafc' }}>{tx.item?.title || 'Shared Product'}</span>
         </div>

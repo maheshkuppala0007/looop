@@ -15,7 +15,8 @@ import {
   Sparkles,
   Repeat,
   ShieldCheck,
-  Ban
+  Ban,
+  MessageSquare
 } from 'lucide-react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
@@ -497,6 +498,27 @@ export const RequestsPage = () => {
                         </Link>
                       )}
 
+                      {req.status === 'ACCEPTED' && (
+                        <Link
+                          to={`/requests/${reqId}`}
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            iconLeft={MessageSquare}
+                            style={{
+                              backgroundColor: '#059669',
+                              borderColor: '#059669',
+                              fontWeight: 700,
+                              boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)'
+                            }}
+                          >
+                            Chat with {ownerName || 'Owner'}
+                          </Button>
+                        </Link>
+                      )}
+
                       {isPending && (
                         <Button
                           variant="secondary"
@@ -717,8 +739,30 @@ export const RequestsPage = () => {
                         </Button>
                       </div>
                     ) : (
-                      <div style={{ fontSize: '0.85rem', color: 'var(--color-slate-500)', fontStyle: 'italic' }}>
-                        Processed ({req.status.toLowerCase()})
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {req.status === 'ACCEPTED' && (
+                          <Link
+                            to={`/requests/${reqId}`}
+                            style={{ textDecoration: 'none' }}
+                          >
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              iconLeft={MessageSquare}
+                              style={{
+                                backgroundColor: '#059669',
+                                borderColor: '#059669',
+                                fontWeight: 700,
+                                boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)'
+                              }}
+                            >
+                              Chat with {requester.name || 'Requester'}
+                            </Button>
+                          </Link>
+                        )}
+                        <div style={{ fontSize: '0.85rem', color: 'var(--color-slate-500)', fontStyle: 'italic' }}>
+                          Processed ({req.status.toLowerCase()})
+                        </div>
                       </div>
                     )}
                   </div>

@@ -9,12 +9,10 @@ export const PublishSuccessState = ({ item, onShareAnother }) => {
 
   const itemId = item?._id || item?.id;
   const itemTitle = item?.title || 'Your Item';
-  const primaryImage =
-    item?.images && item.images.length > 0
-      ? typeof item.images[0] === 'string'
-        ? item.images[0]
-        : item.images[0].url
-      : 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80';
+  const rawFirst = item?.images && item.images.length > 0 ? item.images[0] : null;
+  const primaryImage = rawFirst
+    ? (typeof rawFirst === 'string' ? rawFirst : rawFirst.url || '')
+    : '';
 
   return (
     <div style={{ maxWidth: '640px', margin: '2rem auto', textAlign: 'center' }}>
@@ -76,11 +74,20 @@ export const PublishSuccessState = ({ item, onShareAnother }) => {
             textAlign: 'left'
           }}
         >
-          <img
-            src={primaryImage}
-            alt={itemTitle}
-            style={{ width: '56px', height: '56px', borderRadius: 'var(--radius-md)', objectFit: 'cover' }}
-          />
+          {primaryImage ? (
+            <img
+              src={primaryImage}
+              alt={itemTitle}
+              style={{ width: '56px', height: '56px', borderRadius: 'var(--radius-md)', objectFit: 'cover' }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : (
+            <div style={{ width: '56px', height: '56px', borderRadius: 'var(--radius-md)', backgroundColor: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669', flexShrink: 0 }}>
+              <Package size={24} />
+            </div>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>
               {item?.category || 'Community Item'}

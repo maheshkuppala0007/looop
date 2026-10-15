@@ -38,13 +38,13 @@ async function checkOtpRateLimit(cleanEmail, purpose) {
       const lastToken = res.rows[0];
       const timeSinceLast = Date.now() - new Date(lastToken.created_at).getTime();
 
-      // Enforce 30s min interval
-      if (timeSinceLast < 30000) {
-        const waitSec = Math.ceil((30000 - timeSinceLast) / 1000);
+      // Enforce 3s minimum interval (allows instant OTP generation without blocking user for 30 seconds)
+      if (timeSinceLast < 3000) {
+        const waitSec = Math.ceil((3000 - timeSinceLast) / 1000);
         return {
           allowed: false,
           statusCode: 429,
-          message: `Please wait ${waitSec} seconds before requesting a new verification code.`,
+          message: `Please wait ${waitSec} second${waitSec > 1 ? 's' : ''} before requesting a new verification code.`,
           retryAfter: waitSec
         };
       }
@@ -59,7 +59,7 @@ async function checkOtpRateLimit(cleanEmail, purpose) {
     );
 
     const count = parseInt(hourRes.rows[0]?.count || 0, 10);
-    const maxPerHour = process.env.NODE_ENV === 'production' ? 30 : 100;
+    const maxPerHour = 100;
     if (count >= maxPerHour) {
       return {
         allowed: false,
@@ -81,7 +81,7 @@ async function checkOtpRateLimit(cleanEmail, purpose) {
 async function createOtpToken({ userId = null, email, purpose, expiryMinutes = 10 }) {
   const cleanEmail = email.toLowerCase().trim();
 
-  // Enforce rate limit
+  // Enforce minimal rapid-click rate limit (3s)
   const rateLimit = await checkOtpRateLimit(cleanEmail, purpose);
   if (!rateLimit.allowed) {
     return { success: false, ...rateLimit };
@@ -94,21 +94,21 @@ async function createOtpToken({ userId = null, email, purpose, expiryMinutes = 1
   const id = `otp_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 
   try {
-    // Clean up expired tokens for this email & purpose
-    await query(
-      `UPDATE otp_tokens 
-       SET consumed_at = CURRENT_TIMESTAMP 
-       WHERE email = $1 AND purpose = $2 AND consumed_at IS NULL AND expires_at <= CURRENT_TIMESTAMP`,
-      [cleanEmail, purpose]
-    );
-
-    // Insert new hashed token
+    // Insert new hashed token immediately
     await query(
       `INSERT INTO otp_tokens 
         (id, user_id, email, purpose, hashed_otp, expires_at, failed_attempts, resend_count, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       [id, userId, cleanEmail, purpose, hashedOtp, expiresAt]
     );
+
+    // Clean up expired tokens asynchronously in background without blocking dispatch
+    query(
+      `UPDATE otp_tokens 
+       SET consumed_at = CURRENT_TIMESTAMP 
+       WHERE email = $1 AND purpose = $2 AND consumed_at IS NULL AND expires_at <= CURRENT_TIMESTAMP`,
+      [cleanEmail, purpose]
+    ).catch(() => {});
 
     // Return the unhashed rawOtp ONLY to the calling service so it can render the email template.
     // The rawOtp is NEVER logged or saved to the database!
