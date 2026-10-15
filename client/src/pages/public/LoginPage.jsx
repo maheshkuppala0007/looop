@@ -149,7 +149,45 @@ export const LoginPage = () => {
         throw new Error('Invalid email or password. Please try again.');
       }
 
-      // Credentials are confirmed correct! Sign in directly
+      // Check if the authenticated user is an administrator
+      const role = (loginResponse.user?.role || '').toLowerCase();
+      const isAdmin =
+        role === 'admin' ||
+        targetEmail.toLowerCase() === 'looop.support@gmail.com' ||
+        targetEmail.toLowerCase() === 'maheshkuppala321@gmail.com' ||
+        targetEmail.toLowerCase() === 'admin@looop.community';
+
+      if (isAdmin) {
+        // ADMIN FLOW: Require 2-step Email OTP verification
+        setPendingSession({
+          user: loginResponse.user,
+          token: loginResponse.token
+        });
+
+        try {
+          await authService.sendOtp(targetEmail, 'LOGIN_OTP');
+        } catch (otpErr) {
+          console.warn('sendOtp notice on admin login:', otpErr?.message);
+          if (otpErr?.response?.status !== 429) {
+            throw otpErr;
+          }
+        }
+
+        setLoginStep('otp');
+        setOtpDigits(['', '', '', '', '', '']);
+        setOtpCountdown(30);
+
+        addToast({
+          title: 'Admin Verification Required',
+          message: `Admin credentials verified! A 6-digit login security code has been sent to ${targetEmail}.`,
+          variant: 'info'
+        });
+
+        setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
+        return;
+      }
+
+      // CUSTOMER FLOW: Credentials verified! Sign in directly
       handleAuthSuccess(loginResponse.user, loginResponse.token, loginResponse.user.name);
     } catch (err) {
       // Credential failure or server rejection: DO NOT send email, show error message
